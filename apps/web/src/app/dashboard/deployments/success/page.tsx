@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, Globe, Server, CheckCircle2, ChevronRight, Terminal } from 'lucide-react';
 
-export default function DeploymentSuccessPage() {
+function SuccessPageContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
   const [deployment, setDeployment] = useState<any>(null);
@@ -34,7 +34,9 @@ export default function DeploymentSuccessPage() {
     );
   }
 
-  const isBackend = deployment?.project?.name?.includes('api') || deployment?.project?.name?.includes('backend');
+  const isBackend = deployment?.project?.name?.toLowerCase().includes('api') || 
+                    deployment?.project?.name?.toLowerCase().includes('backend') ||
+                    deployment?.framework === 'EXPRESS';
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-8 selection:bg-emerald-500/30">
@@ -61,7 +63,6 @@ export default function DeploymentSuccessPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Preview Area */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
               <div className="bg-white/5 px-6 py-4 border-b border-white/5 flex items-center justify-between">
@@ -80,7 +81,6 @@ export default function DeploymentSuccessPage() {
                 </div>
               </div>
 
-              {/* The "Real" Output Simulation */}
               <div className="p-12 min-h-[400px] flex items-center justify-center">
                 {isBackend ? (
                   <div className="w-full max-w-md space-y-4">
@@ -122,7 +122,6 @@ export default function DeploymentSuccessPage() {
               </div>
             </div>
 
-            {/* Runtime Info */}
             <div className="grid grid-cols-3 gap-4">
               {[
                 { label: 'Latency', value: '24ms', color: 'text-emerald-400' },
@@ -137,7 +136,6 @@ export default function DeploymentSuccessPage() {
             </div>
           </div>
 
-          {/* Sidebar Info */}
           <div className="space-y-6">
             <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-3xl space-y-4">
               <div className="flex items-center gap-3">
@@ -184,5 +182,17 @@ export default function DeploymentSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DeploymentSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
+      </div>
+    }>
+      <SuccessPageContent />
+    </Suspense>
   );
 }
