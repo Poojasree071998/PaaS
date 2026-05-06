@@ -43,5 +43,9 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+// Manually set defaults for libraries that read directly from process.env (like Prisma)
+if (!process.env.DATABASE_URL) process.env.DATABASE_URL = parsed.data.DATABASE_URL;
+if (!process.env.REDIS_URL) process.env.REDIS_URL = parsed.data.REDIS_URL;
+
 export const config = parsed.data;
 export default config;

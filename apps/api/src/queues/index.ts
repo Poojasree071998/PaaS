@@ -5,6 +5,11 @@ import logger from '../config/logger';
 
 const connection = new IORedis(config.REDIS_URL, {
   maxRetriesPerRequest: null,
+  retryStrategy: (times) => Math.min(times * 50, 2000),
+});
+
+connection.on('error', (err) => {
+  logger.warn('📡 Redis connection failed. Some background features may be limited.');
 });
 
 export const buildQueue = new Queue('build', { connection });
