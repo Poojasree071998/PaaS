@@ -6,22 +6,22 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('4000'),
-  DATABASE_URL: z.string(),
-  REDIS_URL: z.string(),
+  DATABASE_URL: z.string().optional(),
+  REDIS_URL: z.string().optional(),
   
-  JWT_ACCESS_SECRET: z.string(),
-  JWT_REFRESH_SECRET: z.string(),
+  JWT_ACCESS_SECRET: z.string().default('dev-secret-access'),
+  JWT_REFRESH_SECRET: z.string().default('dev-secret-refresh'),
   JWT_EXPIRES_IN: z.string().default('15m'),
   
-  ENCRYPTION_MASTER_KEY: z.string().length(32), // 32 characters for AES-256
+  ENCRYPTION_MASTER_KEY: z.string().default('12345678901234567890123456789012'),
   
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   
-  AWS_ACCESS_KEY_ID: z.string(),
-  AWS_SECRET_ACCESS_KEY: z.string(),
-  AWS_BUCKET: z.string(),
-  AWS_REGION: z.string(),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_BUCKET: z.string().optional(),
+  AWS_REGION: z.string().optional(),
   
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
