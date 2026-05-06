@@ -33,9 +33,10 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const apiUrl = `http://${window.location.hostname}:4000`;
         const [depRes, logsRes] = await Promise.all([
-          fetch(`http://localhost:4000/api/deployments/${id}`),
-          fetch(`http://localhost:4000/api/deployments/${id}/logs`)
+          fetch(`${apiUrl}/api/deployments/${id}`),
+          fetch(`${apiUrl}/api/deployments/${id}/logs`)
         ]);
         
         const depData = await depRes.json();
@@ -62,7 +63,8 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
 
     fetchData();
 
-    const socket = io('http://localhost:4000');
+    const socketUrl = typeof window !== 'undefined' ? `http://${window.location.hostname}:4000` : 'http://localhost:4000';
+    const socket = io(socketUrl);
     socket.emit('join:deployment', id);
 
     socket.on('deployment:log', (log: Log) => {
@@ -115,7 +117,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
         <div className="ml-auto flex gap-3">
           {status === 'READY' && (
             <a 
-              href={deployment?.url || '#'} 
+              href={deployment?.url?.startsWith('/') ? `${window.location.origin}${deployment.url}` : (deployment?.url || '#')} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-semibold text-sm hover:bg-zinc-200 transition-all active:scale-95 shadow-lg shadow-white/10"

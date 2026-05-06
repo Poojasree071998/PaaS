@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect, useState } from 'react';
 import { 
   Activity, 
   GitBranch, 
@@ -9,54 +10,43 @@ import {
   AlertCircle, 
   Timer,
   Search,
-  Filter
+  Filter,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 
-const deployments = [
-  {
-    id: 'd123456',
-    project: 'deployflow-api',
-    branch: 'main',
-    commit: 'feat: add websocket logging',
-    status: 'Ready',
-    time: '2m ago',
-    duration: '45s',
-    env: 'Production'
-  },
-  {
-    id: 'd123457',
-    project: 'ecommerce-frontend',
-    branch: 'production',
-    commit: 'fix: checkout bug',
-    status: 'Ready',
-    time: '15m ago',
-    duration: '1m 20s',
-    env: 'Production'
-  },
-  {
-    id: 'd123458',
-    project: 'marketing-site',
-    branch: 'feat/new-landing',
-    commit: 'chore: update hero assets',
-    status: 'Error',
-    time: '1h ago',
-    duration: '2m 10s',
-    env: 'Preview'
-  },
-  {
-    id: 'd123459',
-    project: 'deployflow-api',
-    branch: 'main',
-    commit: 'initial commit',
-    status: 'Ready',
-    time: '3h ago',
-    duration: '30s',
-    env: 'Production'
-  }
-];
-
 export default function DeploymentsPage() {
+  const [deployments, setDeployments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDeployments = async () => {
+      try {
+        const apiUrl = `http://${window.location.hostname}:4000/api/deployments`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+        if (data.success) {
+          setDeployments(data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch deployments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDeployments();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-10 h-10 text-zinc-500 animate-spin" />
+        <p className="text-zinc-500 font-medium">Loading your deployments...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between">
@@ -89,76 +79,89 @@ export default function DeploymentsPage() {
                 <th className="px-6 py-4 font-medium">Deployment</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Environment</th>
-                <th className="px-6 py-4 font-medium">Duration</th>
+                <th className="px-6 py-4 font-medium">Time</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {deployments.map((deployment) => (
-                <tr key={deployment.id} className="group hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{deployment.project}</span>
-                        <span className="text-xs text-zinc-500 font-mono">{deployment.id}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <GitBranch className="w-3 h-3 text-zinc-500" />
-                        <span className="text-xs text-zinc-400">{deployment.branch}</span>
-                        <span className="text-[10px] text-zinc-600 truncate max-w-[200px]">"{deployment.commit}"</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {deployment.status === 'Ready' ? (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                          <span className="text-sm text-emerald-500 font-medium">Ready</span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="w-3.5 h-3.5 text-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-                          <span className="text-sm text-red-500 font-medium">Error</span>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-1 rounded border border-white/5 text-zinc-400">
-                      {deployment.env}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-zinc-400">
-                      <Timer className="w-3.5 h-3.5" />
-                      <span className="text-xs">{deployment.duration}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 mt-1">
-                      <Clock className="w-3 h-3" />
-                      {deployment.time}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link 
-                        href={`/dashboard/deployments/${deployment.id}`}
-                        className="text-xs bg-white text-black px-3 py-1.5 rounded font-bold hover:bg-zinc-200 transition-colors shadow-lg shadow-white/5 active:scale-95 transition-transform"
-                      >
-                        Details
-                      </Link>
-                      <a 
-                        href={`https://${deployment.project}.deployflow.app`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white active:scale-95 transition-transform"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
+              {deployments.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-20 text-center">
+                    <p className="text-zinc-500">No deployments found yet.</p>
+                    <Link href="/dashboard/new" className="text-blue-400 hover:underline mt-2 inline-block">
+                      Start your first deployment →
+                    </Link>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                deployments.map((deployment) => (
+                  <tr key={deployment.id} className="group hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">{deployment.project?.name || 'Project'}</span>
+                          <span className="text-xs text-zinc-500 font-mono">{deployment.id.substring(0, 8)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <GitBranch className="w-3 h-3 text-zinc-500" />
+                          <span className="text-xs text-zinc-400">{deployment.branch}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {deployment.status === 'READY' ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                            <span className="text-sm text-emerald-500 font-medium">Ready</span>
+                          </>
+                        ) : deployment.status === 'ERROR' ? (
+                          <>
+                            <AlertCircle className="w-3.5 h-3.5 text-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                            <span className="text-sm text-red-500 font-medium">Error</span>
+                          </>
+                        ) : (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                            <span className="text-sm text-blue-500 font-medium capitalize">{deployment.status.toLowerCase()}</span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-1 rounded border border-white/5 text-zinc-400">
+                        Production
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                        <Clock className="w-3.5 h-3.5" />
+                        {new Date(deployment.createdAt).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link 
+                          href={`/dashboard/deployments/${deployment.id}`}
+                          className="text-xs bg-white text-black px-3 py-1.5 rounded font-bold hover:bg-zinc-200 transition-all active:scale-95 shadow-lg shadow-white/5"
+                        >
+                          Details
+                        </Link>
+                        {deployment.url && (
+                          <a 
+                            href={deployment.url.startsWith('/') ? `${window.location.origin}${deployment.url}` : deployment.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

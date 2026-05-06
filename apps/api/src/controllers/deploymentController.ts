@@ -49,7 +49,11 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
 
 export const listDeployments = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json({ success: true, data: [] });
+    const deployments = await prisma.deployment.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { project: true }
+    });
+    res.json({ success: true, data: deployments });
   } catch (error) {
     next(error);
   }

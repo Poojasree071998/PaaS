@@ -4,14 +4,13 @@ import { authenticate } from '../middlewares/authenticate';
 
 const router = Router();
 
-// Make deployment trigger and details public for local testing demo
+// Make deployment trigger, details, and list public for local testing demo
 router.post('/', deploymentController.triggerDeploy);
+router.get('/', deploymentController.listDeployments);
 router.get('/:deploymentId', deploymentController.getDeployment);
 router.get('/:deploymentId/logs', deploymentController.getLogs);
 
 router.use(authenticate);
-
-router.get('/', deploymentController.listDeployments);
 router.delete('/:deploymentId', deploymentController.cancelDeployment);
 
 router.post('/:deploymentId/rollback', deploymentController.rollbackDeployment);

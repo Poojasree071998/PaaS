@@ -25,7 +25,8 @@ export default function ImportProjectPage() {
     try {
       // For this demo, we'll use a simplified trigger
       // In a real app, this would create the project first
-      const response = await fetch('http://localhost:4000/api/deployments', {
+      const apiUrl = `http://${window.location.hostname}:4000`;
+      const response = await fetch(`${apiUrl}/api/deployments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl: url }),
@@ -75,20 +76,57 @@ export default function ImportProjectPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2 focus-within:border-white/20 transition-colors">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
               <GitBranch className="w-3.5 h-3.5" />
               Default Branch
             </div>
-            <div className="text-sm font-medium">main</div>
+            <input 
+              type="text" 
+              defaultValue="main" 
+              className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
+              placeholder="main"
+            />
           </div>
-          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2 focus-within:border-white/20 transition-colors">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
               <Settings className="w-3.5 h-3.5" />
               Root Directory
             </div>
-            <div className="text-sm font-medium">/ (Root)</div>
+            <input 
+              type="text" 
+              defaultValue="./" 
+              className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
+              placeholder="/ (Root)"
+            />
           </div>
+        </div>
+
+        <div className="space-y-4 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+              <Settings className="w-3.5 h-3.5" />
+              Environment Variables
+            </h3>
+            <button className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">
+              + Add Variable
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input 
+              type="text" 
+              placeholder="DATABASE_URL" 
+              className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
+            />
+            <input 
+              type="text" 
+              placeholder="postgres://user:pass@host:5432/db" 
+              className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
+            />
+          </div>
+          <p className="text-[10px] text-zinc-500 italic">
+            Tip: Backend services use these variables to connect to databases and external APIs.
+          </p>
         </div>
 
         <button 
