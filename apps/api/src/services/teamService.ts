@@ -12,7 +12,7 @@ export class TeamService {
       throw new ConflictError('Team slug already exists, please choose a different name');
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const team = await tx.team.create({
         data: {
           name,
@@ -47,7 +47,7 @@ export class TeamService {
 
     if (!team) throw new NotFoundError('Team not found');
     
-    const isMember = team.members.some(m => m.userId === userId);
+    const isMember = team.members.some((m: any) => m.userId === userId);
     if (!isMember) throw new ForbiddenError('You do not have access to this team');
 
     return team;

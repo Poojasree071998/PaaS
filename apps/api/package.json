@@ -12,7 +12,8 @@
     "lint": "eslint src/**/*.ts",
     "prisma:generate": "prisma generate --schema=../../packages/db/prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=../../packages/db/prisma/schema.prisma",
-    "prisma:seed": "ts-node src/prisma/seed.ts"
+    "prisma:seed": "ts-node src/prisma/seed.ts",
+    "test:deploy": "ts-node src/scripts/test-deploy.ts"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
+    "@types/dockerode": "^4.0.1",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
     "@types/jsonwebtoken": "^9.0.6",
@@ -46,6 +48,7 @@
     "@aws-sdk/client-s3": "^3.554.0",
     "@aws-sdk/lib-storage": "^3.554.0",
     "@prisma/client": "^5.12.1",
+    "@types/tar-fs": "^2.0.4",
     "acme-client": "^5.2.0",
     "archiver": "^7.0.1",
     "axios": "^1.6.8",
@@ -62,13 +65,14 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.13",
-    "qrcode": "^1.5.3",
+    "qrcode": "^1.5.4",
     "simple-git": "^3.24.0",
     "slugify": "^1.6.6",
     "socket.io": "^4.7.5",
     "speakeasy": "^2.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
+    "tar-fs": "^3.1.2",
     "tar-stream": "^3.1.7",
     "winston": "^3.13.0",
     "zod": "^3.22.4"

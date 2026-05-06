@@ -21,7 +21,7 @@ export class AuthService {
 
   static generateTokens(payload: { id: string; email: string; role: Role }) {
     const accessToken = jwt.sign(payload, config.JWT_ACCESS_SECRET, {
-      expiresIn: config.JWT_EXPIRES_IN || this.ACCESS_TOKEN_EXPIRY,
+      expiresIn: (config.JWT_EXPIRES_IN || this.ACCESS_TOKEN_EXPIRY) as any,
     });
     
     const refreshToken = jwt.sign(payload, config.JWT_REFRESH_SECRET, {

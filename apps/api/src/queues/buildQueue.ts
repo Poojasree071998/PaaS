@@ -32,8 +32,8 @@ export const buildWorker = new Worker(
         const log = await prisma.buildLog.create({
           data: {
             deploymentId,
-            content: `Starting stage: ${stage}...`,
-            level: 'info',
+            message: `Starting stage: ${stage}...`,
+            level: 'INFO',
           },
         });
 
@@ -46,8 +46,8 @@ export const buildWorker = new Worker(
         const successLog = await prisma.buildLog.create({
           data: {
             deploymentId,
-            content: `Completed stage: ${stage} successfully.`,
-            level: 'info',
+            message: `Completed stage: ${stage} successfully.`,
+            level: 'INFO',
           },
         });
         io.to(`deployment:${deploymentId}`).emit('log', successLog);
@@ -68,14 +68,14 @@ export const buildWorker = new Worker(
       
       await prisma.deployment.update({
         where: { id: deploymentId },
-        data: { status: 'FAILED' },
+        data: { status: 'ERROR' },
       });
 
       const errorLog = await prisma.buildLog.create({
         data: {
           deploymentId,
-          content: `Build failed: ${error.message}`,
-          level: 'error',
+          message: `Build failed: ${error.message}`,
+          level: 'ERROR',
         },
       });
       io.to(`deployment:${deploymentId}`).emit('log', errorLog);

@@ -61,9 +61,15 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-white/10">
-        <button className="w-full flex items-center justify-center gap-2 bg-white text-black py-2.5 rounded-lg font-semibold text-sm hover:bg-zinc-200 transition-colors shadow-lg active:scale-[0.98]">
-          <Plus className="w-4 h-4" />
-          New Project
+        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors group">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-emerald-700 flex items-center justify-center text-sm font-bold text-white shadow-lg group-hover:scale-105 transition-transform">
+            N
+          </div>
+          <div className="flex flex-col items-start flex-1 min-w-0">
+            <span className="text-sm font-medium text-white truncate">Nikita</span>
+            <span className="text-xs text-zinc-500 truncate">Pro Plan</span>
+          </div>
+          <Settings className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
         </button>
       </div>
     </div>

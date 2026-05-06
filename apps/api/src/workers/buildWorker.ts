@@ -17,7 +17,7 @@ buildWorker.on('completed', (job) => {
 });
 
 buildWorker.on('failed', (job, err) => {
-  logger.error(`Build job ${job.id} failed: ${err.message}`);
+  logger.error(`Build job ${job?.id} failed: ${err.message}`);
 });
 
 export default buildWorker;

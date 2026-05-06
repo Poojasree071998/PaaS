@@ -1,4 +1,4 @@
-import { PrismaClient, Role, TeamRole, Plan, RepoProvider, Framework, ProjectStatus, DeploymentEnvironment, DeploymentStatus, LogLevel } from '@prisma/client';
+import { PrismaClient, Role, TeamRole, Plan, RepoProvider, Framework, ProjectStatus, DeploymentEnvironment, DeploymentStatus, LogLevel, DatabaseType, DatabaseStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();

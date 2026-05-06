@@ -103,3 +103,109 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
     next(error);
   }
 };
+
+export const logout = async (req: Request, res: Response, next: NextFunction) => {
+  // In a real implementation, you might want to invalidate the refresh token in Redis
+  res.json({ success: true, message: 'Logged out successfully' });
+};
+
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+  // TODO: Generate reset token, save to DB/Redis, send email
+  res.json({ success: true, message: 'Password reset email sent (mock)' });
+};
+
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+  // TODO: Verify reset token, update password
+  res.json({ success: true, message: 'Password reset successfully (mock)' });
+};
+
+export const verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  // TODO: Verify email token
+  res.json({ success: true, message: 'Email verified successfully (mock)' });
+};
+
+export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { name, avatar } = req.body;
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { name, avatar },
+      select: { id: true, email: true, name: true, role: true, avatar: true }
+    });
+    res.json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const enable2FA = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { secret, qrCodeUrl } = await AuthService.generate2FA(req.user!.id);
+    
+    // Save secret to user
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { twoFactorSecret: secret }
+    });
+    
+    res.json({ success: true, data: { qrCodeUrl, secret } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verify2FA = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.body;
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    
+    if (!user?.twoFactorSecret) {
+      throw new BadRequestError('2FA is not initiated');
+    }
+    
+    const isValid = AuthService.verify2FAToken(user.twoFactorSecret, token);
+    
+    if (!isValid) {
+      throw new UnauthorizedError('Invalid 2FA token');
+    }
+    
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { twoFactorEnabled: true }
+    });
+    
+    res.json({ success: true, message: '2FA enabled successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const disable2FA = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { twoFactorEnabled: false, twoFactorSecret: null }
+    });
+    res.json({ success: true, message: '2FA disabled successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const githubOAuth = async (req: Request, res: Response, next: NextFunction) => {
+  // TODO: Redirect to GitHub OAuth
+  res.redirect('https://github.com/login/oauth/authorize?client_id=MOCK');
+};
+
+export const githubOAuthCallback = async (req: Request, res: Response, next: NextFunction) => {
+  // TODO: Exchange code for token, upsert user, generate JWT tokens
+  res.json({ success: true, message: 'GitHub OAuth Callback (mock)' });
+};
+
+export const gitlabOAuth = async (req: Request, res: Response, next: NextFunction) => {
+  res.redirect('https://gitlab.com/oauth/authorize?client_id=MOCK');
+};
+
+export const gitlabOAuthCallback = async (req: Request, res: Response, next: NextFunction) => {
+  res.json({ success: true, message: 'GitLab OAuth Callback (mock)' });
+};
