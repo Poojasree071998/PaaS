@@ -10,7 +10,42 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { useEffect, useState } from 'react';
+import { getApiUrl } from '@/lib/api';
+import { formatDistanceToNow } from 'date-fns';
+
 export default function DashboardOverview() {
+  const [stats, setStats] = useState({ projects: 0, deployments: 0, uptime: '99.9%' });
+  const [recentDeployments, setRecentDeployments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const apiUrl = getApiUrl();
+        const response = await fetch(`${apiUrl}/api/deployments`);
+        const data = await response.json();
+        if (data.success) {
+          const deps = data.data;
+          setRecentDeployments(deps.slice(0, 4));
+          
+          // Calculate stats
+          const uniqueProjects = new Set(deps.map((d: any) => d.projectId)).size;
+          setStats({
+            projects: uniqueProjects,
+            deployments: deps.length,
+            uptime: '100%'
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="flex items-center justify-between">
@@ -30,7 +65,7 @@ export default function DashboardOverview() {
             <Box className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Active Projects</span>
           </div>
-          <div className="text-3xl font-bold">12</div>
+          <div className="text-3xl font-bold">{stats.projects}</div>
           <div className="text-[10px] text-emerald-500 font-bold mt-2 flex items-center gap-1">
             <ArrowUpRight className="w-3 h-3" />
             +2 this month
@@ -41,7 +76,7 @@ export default function DashboardOverview() {
             <Zap className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Deployments</span>
           </div>
-          <div className="text-3xl font-bold">1,248</div>
+          <div className="text-3xl font-bold">{stats.deployments}</div>
           <div className="text-[10px] text-emerald-500 font-bold mt-2 flex items-center gap-1">
             <ArrowUpRight className="w-3 h-3" />
             +18% growth
@@ -52,7 +87,7 @@ export default function DashboardOverview() {
             <Activity className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Uptime</span>
           </div>
-          <div className="text-3xl font-bold">99.99%</div>
+          <div className="text-3xl font-bold">{stats.uptime}</div>
           <div className="text-[10px] text-emerald-500 font-bold mt-2 flex items-center gap-1">
             <CheckCircleIcon className="w-3 h-3" />
             All systems normal
@@ -69,26 +104,30 @@ export default function DashboardOverview() {
             </Link>
           </div>
           <div className="glass-card divide-y divide-white/5">
-            {[
-              { app: 'deployflow-api', status: 'deployed', time: '2m ago', env: 'production' },
-              { app: 'ecommerce-frontend', status: 'deployed', time: '15m ago', env: 'production' },
-              { app: 'marketing-site', status: 'failed', time: '1h ago', env: 'staging' },
-              { app: 'analytics-worker', status: 'deployed', time: '3h ago', env: 'production' },
-            ].map((item, i) => (
-              <div key={i} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-colors group">
-                <div className={`w-2 h-2 rounded-full ${item.status === 'deployed' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">{item.app}</span>
-                    <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded border border-white/5 text-zinc-500 uppercase font-bold tracking-tighter">{item.env}</span>
+            {recentDeployments.length === 0 ? (
+              <div className="p-10 text-center text-zinc-500 text-sm">No recent deployments.</div>
+            ) : (
+              recentDeployments.map((item, i) => (
+                <div key={i} className="p-4 flex items-center gap-4 hover:bg-white/5 transition-colors group">
+                  <div className={`w-2 h-2 rounded-full ${item.status === 'READY' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : item.status === 'ERROR' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`} />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">{item.project?.name || 'Unknown Project'}</span>
+                      <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded border border-white/5 text-zinc-500 uppercase font-bold tracking-tighter">production</span>
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {item.status === 'READY' ? 'Successfully deployed' : item.status === 'ERROR' ? 'Deployment failed' : 'Building...'} • {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                    </div>
                   </div>
-                  <div className="text-xs text-zinc-500">{item.status === 'deployed' ? 'Successfully deployed' : 'Deployment failed'} • {item.time}</div>
+                  <Link 
+                    href={`/dashboard/deployments/${item.id}`}
+                    className="text-[10px] font-bold uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-all hover:bg-white/10"
+                  >
+                    Logs
+                  </Link>
                 </div>
-                <button className="text-[10px] font-bold uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-all hover:bg-white/10">
-                  Logs
-                </button>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

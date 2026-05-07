@@ -15,6 +15,7 @@ import {
   Folder
 } from 'lucide-react';
 import Link from 'next/link';
+import { getApiUrl, getSocketUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 interface Log {
@@ -35,9 +36,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     const fetchData = async () => {
       try {
-        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
-        if (!apiUrl.startsWith('http')) apiUrl = `https://${apiUrl}`;
-        if (!apiUrl.includes('.')) apiUrl = `${apiUrl}.onrender.com`;
+        const apiUrl = getApiUrl();
 
         const [depRes, logsRes] = await Promise.all([
           fetch(`${apiUrl}/api/deployments/${id}`),
@@ -68,10 +67,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
 
     fetchData();
 
-    let socketUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
-    if (!socketUrl.startsWith('http')) socketUrl = `https://${socketUrl}`;
-    if (!socketUrl.includes('.')) socketUrl = `${socketUrl}.onrender.com`;
-
+    const socketUrl = getSocketUrl();
     const socket = io(socketUrl);
     socket.emit('join:deployment', id);
 

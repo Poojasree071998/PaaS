@@ -13,6 +13,7 @@ import {
   Filter,
   Loader2
 } from 'lucide-react';
+import { getApiUrl } from '@/lib/api';
 import Link from 'next/link';
 
 export default function DeploymentsPage() {
@@ -22,8 +23,8 @@ export default function DeploymentsPage() {
   useEffect(() => {
     const fetchDeployments = async () => {
       try {
-        const apiUrl = `http://${window.location.hostname}:4000/api/deployments`;
-        const response = await fetch(apiUrl);
+        const apiUrl = getApiUrl();
+        const response = await fetch(`${apiUrl}/api/deployments`);
         const data = await response.json();
         if (data.success) {
           setDeployments(data.data);

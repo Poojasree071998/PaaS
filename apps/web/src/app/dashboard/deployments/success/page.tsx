@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { getApiUrl } from '@/lib/api';
 import { Loader2, Globe, Server, CheckCircle2, ChevronRight, Terminal } from 'lucide-react';
 
 function SuccessPageContent() {
@@ -14,7 +15,8 @@ function SuccessPageContent() {
     if (!id) return;
     const fetchDetails = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:4000/api/deployments/${id}`);
+        const apiUrl = getApiUrl();
+        const response = await fetch(`${apiUrl}/api/deployments/${id}`);
         const data = await response.json();
         if (data.success) setDeployment(data.data);
       } catch (e) {

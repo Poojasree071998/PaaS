@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getApiUrl } from "@/lib/api";
 import { motion, Variants } from "framer-motion";
 import { Rocket, Code, Globe, Zap, Shield, ArrowRight, Layers, Box } from "lucide-react";
 
@@ -43,9 +44,14 @@ export default function Home() {
           <span className="text-xl font-bold tracking-tight">DeployFlow</span>
         </div>
         <div className="flex items-center gap-6">
-          <Link href="/docs" className="text-sm text-zinc-400 hover:text-white transition-colors">
+          <a 
+            href={`${getApiUrl()}/api/docs`} 
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-zinc-400 hover:text-white transition-colors"
+          >
             Documentation
-          </Link>
+          </a>
           <Link href="/pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">
             Pricing
           </Link>

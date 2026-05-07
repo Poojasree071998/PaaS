@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { getApiUrl } from '@/lib/api';
 import { useState } from 'react';
 
 export default function ImportProjectPage() {
@@ -36,17 +37,11 @@ export default function ImportProjectPage() {
     setLoading(true);
     
     try {
-      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
-      
-      // 1. Add protocol if missing
-      if (!apiUrl.startsWith('http')) {
-        apiUrl = `https://${apiUrl}`;
-      }
+      const apiUrl = getApiUrl();
+      console.log('🚀 Triggering deployment at:', `${apiUrl}/api/deployments`);
 
-      // 2. Add domain if missing (Render property:host sometimes returns only service name)
-      if (!apiUrl.includes('.')) {
-        apiUrl = `${apiUrl}.onrender.com`;
-      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for Render cold starts
 
       const response = await fetch(`${apiUrl}/api/deployments`, {
         method: 'POST',
@@ -57,15 +52,24 @@ export default function ImportProjectPage() {
           rootDirectory,
           envVars: envVars.filter(v => v.key && v.value)
         }),
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
       const data = await response.json();
+      
       if (data.success) {
         router.push(`/dashboard/deployments/${data.data.id}`);
+      } else {
+        alert(`API Error: ${data.error?.message || 'Unknown error'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Deployment failed:', error);
-      alert(`Deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please check if the API is awake at https://deployflow-api.onrender.com`);
+      if (error.name === 'AbortError') {
+        alert('Request timed out. The API might be sleeping or unreachable. Please try again in 30 seconds.');
+      } else {
+        alert(`Deployment failed: ${error.message}. Please check if the API is awake at ${getApiUrl()}`);
+      }
     } finally {
       setLoading(false);
     }
