@@ -56,15 +56,15 @@ export class BuildService {
       }
 
       // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `📦 [2/3] Installing dependencies (this may take 2-3 mins)...`, LogLevel.INFO);
-      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund'], workingDir);
+      await this.log(deploymentId, `📦 [2/3] Installing dependencies (this may take 3-5 mins for monorepos)...`, LogLevel.INFO);
+      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, 600000); // 10 min timeout
       
       await this.log(deploymentId, `🔨 [3/3] Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
       
-      await this.executeLiveCommand(deploymentId, cmd, args, workingDir);
+      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, 600000); // 10 min timeout
 
       // --- SUCCESS ---
       let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
@@ -96,9 +96,14 @@ export class BuildService {
   }
 
   // Uses 'spawn' instead of 'exec' for REAL-TIME line-by-line logging
-  private static async executeLiveCommand(deploymentId: string, command: string, args: string[], cwd: string) {
+  private static async executeLiveCommand(deploymentId: string, command: string, args: string[], cwd: string, timeoutMs: number = 300000) {
     return new Promise((resolve, reject) => {
       const child = spawn(command, args, { cwd, shell: true });
+      
+      const timeout = setTimeout(() => {
+        child.kill();
+        reject(new Error(`Command timed out after ${timeoutMs / 1000}s`));
+      }, timeoutMs);
 
       child.stdout.on('data', (data) => {
         const lines = data.toString().split('\n');
@@ -114,7 +119,13 @@ export class BuildService {
         });
       });
 
+      child.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+
       child.on('close', (code) => {
+        clearTimeout(timeout);
         if (code === 0) resolve(true);
         else reject(new Error(`Exit code ${code}`));
       });
