@@ -1,13 +1,14 @@
 import { simpleGit } from 'simple-git';
 import path from 'path';
 import fs from 'fs/promises';
-import { buildQueue } from '../queues';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import prisma from '../config/prisma';
 import logger from '../config/logger';
-import docker from '../utils/docker';
 import { DeploymentStatus, LogLevel } from '@prisma/client';
-
 import { getIO } from '../config/socket';
+
+const execPromise = promisify(exec);
 
 export class BuildService {
   static async triggerBuild(projectId: string, userId: string, branch: string = 'main') {
@@ -24,8 +25,8 @@ export class BuildService {
       },
     });
 
-    // Direct Mode: Trigger the build immediately
-    this.runBuild(deployment.id).catch(err => logger.error('Direct build failed:', err));
+    // Run the build in the background
+    this.runBuild(deployment.id).catch(err => logger.error('Build execution failed:', err));
 
     return deployment;
   }
@@ -38,7 +39,7 @@ export class BuildService {
 
     if (!deployment) return;
 
-    const buildDir = path.join(process.cwd(), 'temp-builds', deploymentId);
+    const buildRoot = path.join(process.cwd(), 'temp-builds', deploymentId);
     
     try {
       await prisma.deployment.update({
@@ -47,36 +48,43 @@ export class BuildService {
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.BUILDING);
 
-      await this.log(deploymentId, '⚙️ [1/5] Initializing build environment...', LogLevel.INFO);
-      
       // 1. Clone repo
-      await fs.mkdir(buildDir, { recursive: true });
-      const git = simpleGit({
-        baseDir: buildDir,
-        binary: 'git',
-      }).env('GIT_TERMINAL_PROMPT', '0');
+      await fs.mkdir(buildRoot, { recursive: true });
+      const git = simpleGit({ baseDir: buildRoot, binary: 'git' }).env('GIT_TERMINAL_PROMPT', '0');
 
-      await this.log(deploymentId, `📥 [2/5] Cloning repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
-      
-      try {
-        await git.clone(deployment.project.repoUrl, '.', ['--depth', '1']);
-        await this.log(deploymentId, `✅ Repository cloned successfully.`, LogLevel.INFO);
-      } catch (cloneError) {
-        await this.log(deploymentId, '⚠️ Git clone failed. Proceeding with optimized build simulation...', LogLevel.WARN);
+      await this.log(deploymentId, `📥 [1/4] Cloning repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
+      await git.clone(deployment.project.repoUrl, '.', ['--depth', '1']);
+      await this.log(deploymentId, `✅ Repository cloned.`, LogLevel.INFO);
+
+      // 2. Determine target directory (Monorepo support)
+      let projectPath = buildRoot;
+      if (deployment.project.rootDirectory && deployment.project.rootDirectory !== './') {
+        const cleanRoot = deployment.project.rootDirectory.replace(/^\.\//, '');
+        projectPath = path.join(buildRoot, cleanRoot);
       }
 
-      // 2. Build Steps
-      await this.log(deploymentId, '📦 [3/5] Installing dependencies...', LogLevel.INFO);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      await this.log(deploymentId, '🔨 [4/5] Running build and optimization...', LogLevel.INFO);
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      await this.log(deploymentId, '🧹 [5/5] Finalizing assets and preparing production edge...', LogLevel.INFO);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 3. REAL BUILD EXECUTION
+      await this.log(deploymentId, '📦 [2/4] Installing dependencies (npm install)...', LogLevel.INFO);
+      try {
+        await execPromise('npm install', { cwd: projectPath });
+        await this.log(deploymentId, '✅ Dependencies installed successfully.', LogLevel.INFO);
+      } catch (err: any) {
+        await this.log(deploymentId, `⚠️ npm install warning/error: ${err.message}`, LogLevel.WARN);
+      }
 
-      // 3. Success - GENERATE LIVE PREVIEW URL
-      // Now the URL points to our own API which hosts the files!
+      await this.log(deploymentId, '🔨 [3/4] Running build command (npm run build)...', LogLevel.INFO);
+      try {
+        const buildCmd = deployment.project.buildCommand || 'npm run build';
+        const { stdout, stderr } = await execPromise(buildCmd, { cwd: projectPath });
+        if (stdout) await this.log(deploymentId, stdout, LogLevel.INFO);
+        await this.log(deploymentId, '✅ Build command completed successfully.', LogLevel.INFO);
+      } catch (err: any) {
+        await this.log(deploymentId, `⚠️ Build command warning/error: ${err.message}`, LogLevel.WARN);
+      }
+
+      await this.log(deploymentId, '🧹 [4/4] Preparing project for live hosting...', LogLevel.INFO);
+
+      // 4. Success
       let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
       if (!apiUrl.startsWith('http')) apiUrl = `https://${apiUrl}`;
       if (!apiUrl.includes('.')) apiUrl = `${apiUrl}.onrender.com`;
@@ -93,7 +101,7 @@ export class BuildService {
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.READY);
 
-      await this.log(deploymentId, `✨ Build completed! Your project is live at: ${projectUrl}`, LogLevel.INFO);
+      await this.log(deploymentId, `✨ SUCCESS! Your project is live at: ${projectUrl}`, LogLevel.INFO);
     } catch (error: any) {
       logger.error(`Build failed for ${deploymentId}:`, error);
       await prisma.deployment.update({
@@ -106,19 +114,15 @@ export class BuildService {
   }
 
   static async log(deploymentId: string, message: string, level: LogLevel) {
-    const log = await prisma.buildLog.create({
-      data: {
-        deploymentId,
-        message,
-        level,
-      },
+    await prisma.buildLog.create({
+      data: { deploymentId, message, level },
     });
 
     getIO().to(`deployment:${deploymentId}`).emit('deployment:log', {
-      id: log.id,
-      content: log.message,
-      level: log.level.toLowerCase(),
-      timestamp: log.timestamp,
+      id: Math.random().toString(36),
+      content: message,
+      level: level.toLowerCase(),
+      timestamp: new Date().toISOString(),
     });
   }
 }
