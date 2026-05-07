@@ -1,6 +1,7 @@
 import { simpleGit } from 'simple-git';
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs';
+import fsPromises from 'fs/promises';
 import { spawn } from 'child_process';
 import prisma from '../config/prisma';
 import logger from '../config/logger';
@@ -43,7 +44,7 @@ export class BuildService {
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.BUILDING);
 
-      await fs.mkdir(buildDir, { recursive: true });
+      await fsPromises.mkdir(buildDir, { recursive: true });
       const git = simpleGit({ baseDir: buildDir, binary: 'git' });
 
       await this.log(deploymentId, `📥 [1/3] Cloning repository...`, LogLevel.INFO);
