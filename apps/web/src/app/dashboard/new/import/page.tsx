@@ -33,7 +33,15 @@ export default function ImportProjectPage() {
     if (!url) return;
     setLoading(true);
     
+    try {
+      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://deployflow-api.onrender.com';
+      
+      // Ensure apiUrl is absolute
+      if (!apiUrl.startsWith('http')) {
+        apiUrl = `https://${apiUrl}`;
+      }
 
+      const response = await fetch(`${apiUrl}/api/deployments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
