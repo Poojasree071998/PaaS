@@ -27,6 +27,8 @@ import adminRoutes from './routes/adminRoutes';
 const app = express();
 
 // Security Middlewares
+app.set('strict routing', false);
+app.set('case sensitive routing', false);
 app.use(helmet({
   contentSecurityPolicy: false, 
 }));
