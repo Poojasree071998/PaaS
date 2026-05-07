@@ -56,8 +56,9 @@ export class BuildService {
       }
 
       // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `📦 [2/3] Installing dependencies (this may take 3-5 mins for monorepos)...`, LogLevel.INFO);
-      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, 600000); // 10 min timeout
+      await this.log(deploymentId, `📦 [2/3] Installing dependencies (Memory Optimized)...`, LogLevel.INFO);
+      // Added --prefer-offline and --no-package-lock to save RAM on Render
+      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund', '--loglevel', 'info', '--prefer-offline', '--no-package-lock'], workingDir, 600000); 
       
       await this.log(deploymentId, `🔨 [3/3] Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
@@ -130,6 +131,31 @@ export class BuildService {
         else reject(new Error(`Exit code ${code}`));
       });
     });
+  }
+
+  static async cleanupStuckBuilds() {
+    try {
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+      const stuckDeployments = await prisma.deployment.findMany({
+        where: {
+          status: DeploymentStatus.BUILDING,
+          updatedAt: { lt: fifteenMinutesAgo },
+        },
+      });
+
+      for (const dep of stuckDeployments) {
+        await prisma.deployment.update({
+          where: { id: dep.id },
+          data: { 
+            status: DeploymentStatus.ERROR, 
+            errorMessage: 'Build process was interrupted (likely due to server restart or OOM)' 
+          },
+        });
+        await this.log(dep.id, '❌ ERROR: Build process was interrupted. Please try again.', LogLevel.ERROR);
+      }
+    } catch (e) {
+      logger.error('Failed to cleanup stuck builds:', e);
+    }
   }
 
   static async log(deploymentId: string, message: string, level: LogLevel) {

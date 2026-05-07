@@ -9,6 +9,7 @@ import './workers/buildWorker';
 const server = http.createServer(app);
 
 import { initSocket } from './config/socket';
+import { BuildService } from './services/buildService';
 
 // Socket.io Setup
 const io = initSocket(server);
@@ -23,6 +24,10 @@ async function bootstrap() {
     // 1. Connect to Database
     await prisma.$connect();
     logger.info('🐘 Connected to Database');
+
+    // 2. Cleanup stuck builds
+    await BuildService.cleanupStuckBuilds();
+    logger.info('🧹 Cleaned up stuck builds');
 
     // 2. Start Server
     server.listen(PORT, () => {
