@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
+import fs from 'fs';
 import { errorHandler } from './middlewares/errorHandler';
 import { standardRateLimiter } from './middlewares/rateLimiter';
 import logger from './config/logger';
@@ -24,7 +26,9 @@ import adminRoutes from './routes/adminRoutes';
 const app = express();
 
 // Security Middlewares
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled for live preview iframe support
+}));
 app.use(cors());
 app.use(standardRateLimiter);
 
@@ -35,6 +39,20 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// --- LIVE HOSTING ENGINE ---
+// This serves the actual files from the build directory
+app.use('/live/:id', (req, res, next) => {
+  const { id } = req.params;
+  const buildPath = path.join(process.cwd(), 'temp-builds', id);
+  
+  if (fs.existsSync(buildPath)) {
+    // If it's a frontend project, we serve the static files
+    // In a real monorepo, we might need to check for /dist or /build
+    express.static(buildPath)(req, res, next);
+  } else {
+    res.status(404).send('Project build not found or expired.');
+  }
+});
 
 app.get('/health', (req, res) => {
   res.json({ success: true, status: 'UP' });

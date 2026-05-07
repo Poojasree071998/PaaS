@@ -75,9 +75,13 @@ export class BuildService {
       await this.log(deploymentId, '🧹 [5/5] Finalizing assets and preparing production edge...', LogLevel.INFO);
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // 3. Success - GENERATE REAL PROJECT URL
-      // We use the project slug to create a realistic-looking Render/DeployFlow URL
-      const projectUrl = `https://${deployment.project.slug}.onrender.com`;
+      // 3. Success - GENERATE LIVE PREVIEW URL
+      // Now the URL points to our own API which hosts the files!
+      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
+      if (!apiUrl.startsWith('http')) apiUrl = `https://${apiUrl}`;
+      if (!apiUrl.includes('.')) apiUrl = `${apiUrl}.onrender.com`;
+      
+      const projectUrl = `${apiUrl}/live/${deploymentId}`;
 
       await prisma.deployment.update({
         where: { id: deploymentId },
