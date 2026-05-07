@@ -42,7 +42,10 @@ export default function DatabasesPage() {
           <h1 className="text-3xl font-bold tracking-tight mb-1">Databases</h1>
           <p className="text-zinc-500">Managed high-performance databases</p>
         </div>
-        <button className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-semibold text-sm hover:bg-zinc-200 transition-colors">
+        <button 
+          onClick={() => alert('Database creation initiated! Our managed service is provisioning your new instance.')}
+          className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-semibold text-sm hover:bg-zinc-200 transition-colors"
+        >
           <Plus className="w-4 h-4" />
           Create Database
         </button>

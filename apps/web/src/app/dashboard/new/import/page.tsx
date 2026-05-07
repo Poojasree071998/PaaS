@@ -16,32 +16,7 @@ import { useState } from 'react';
 export default function ImportProjectPage() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  const handleDeploy = async () => {
-    if (!url) return;
-    setLoading(true);
-    
-    try {
-      // For this demo, we'll use a simplified trigger
-      // In a real app, this would create the project first
-      const apiUrl = `http://${window.location.hostname}:4000`;
-      const response = await fetch(`${apiUrl}/api/deployments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoUrl: url }),
-      });
-      
-      const data = await response.json();
-      if (data.success) {
-        router.push(`/dashboard/deployments/${data.data.id}`);
-      }
-    } catch (error) {
-      console.error('Deployment failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 py-10">
@@ -104,30 +79,7 @@ export default function ImportProjectPage() {
 
         <div className="space-y-4 pt-4 border-t border-white/5">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-              <Settings className="w-3.5 h-3.5" />
-              Environment Variables
-            </h3>
-            <button className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">
-              + Add Variable
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input 
-              type="text" 
-              placeholder="DATABASE_URL" 
-              className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
-            />
-            <input 
-              type="text" 
-              placeholder="postgres://user:pass@host:5432/db" 
-              className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
-            />
-          </div>
-          <p className="text-[10px] text-zinc-500 italic">
-            Tip: Backend services use these variables to connect to databases and external APIs.
-          </p>
-        </div>
+
 
         <button 
           onClick={handleDeploy}

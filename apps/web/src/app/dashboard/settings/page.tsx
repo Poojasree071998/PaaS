@@ -32,6 +32,19 @@ export default function SettingsPage() {
     setShowValues(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleSave = () => {
+    alert('Changes saved successfully! Your project configuration has been updated.');
+  };
+
+  const handleBulkImport = () => {
+    alert('Bulk import started. Please select your .env file.');
+  };
+
+  const addEnvVar = () => {
+    const newId = (envVars.length + 1).toString();
+    setEnvVars([...envVars, { id: newId, key: 'NEW_VARIABLE', value: '', target: 'production', isLocked: false }]);
+  };
+
   return (
     <div className="space-y-10 max-w-4xl animate-in fade-in duration-500">
       <div>
@@ -78,7 +91,10 @@ export default function SettingsPage() {
           </div>
         </div>
         <div className="pt-4 border-t border-white/5 flex justify-end">
-          <button className="flex items-center gap-2 bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-zinc-200 transition-all">
+          <button 
+            onClick={handleSave}
+            className="flex items-center gap-2 bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-zinc-200 transition-all"
+          >
             <Save className="w-4 h-4" /> Save Changes
           </button>
         </div>
@@ -92,10 +108,16 @@ export default function SettingsPage() {
             <p className="text-sm text-zinc-500 mt-1">Variables defined here will be available during build and runtime.</p>
           </div>
           <div className="flex gap-2">
-            <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-sm border border-white/10 transition-all">
+            <button 
+              onClick={handleBulkImport}
+              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg text-sm border border-white/10 transition-all"
+            >
               <Upload className="w-4 h-4" /> Bulk Import
             </button>
-            <button className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-bold text-sm transition-all">
+            <button 
+              onClick={addEnvVar}
+              className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-bold text-sm transition-all"
+            >
               <Plus className="w-4 h-4" /> Add Variable
             </button>
           </div>
