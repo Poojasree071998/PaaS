@@ -72,7 +72,7 @@ export class BuildService {
 
       // --- REAL-TIME STREAMING ENGINE ---
       await this.log(deploymentId, `📦 [2/3] Installing Production Dependencies...`, LogLevel.INFO);
-      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, 600000); 
+      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, 1200000); // 20 min timeout
 
       // --- SAVE CACHE ---
       await this.log(deploymentId, `💾 Saving build cache for future use...`, LogLevel.INFO);
@@ -84,7 +84,7 @@ export class BuildService {
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
       
-      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, 600000); // 10 min timeout
+      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, 1200000); // 20 min timeout
 
       // --- SUCCESS ---
       let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
