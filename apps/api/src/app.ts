@@ -27,7 +27,7 @@ const app = express();
 
 // Security Middlewares
 app.use(helmet({
-  contentSecurityPolicy: false, // Disabled for live preview iframe support
+  contentSecurityPolicy: false, 
 }));
 app.use(cors());
 app.use(standardRateLimiter);
@@ -39,19 +39,55 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- LIVE HOSTING ENGINE ---
-// This serves the actual files from the build directory
-app.use('/live/:id', (req, res, next) => {
+// --- SMART LIVE HOSTING ENGINE ---
+app.get('/live/:id*', (req, res, next) => {
   const { id } = req.params;
-  const buildPath = path.join(process.cwd(), 'temp-builds', id);
+  const subPath = req.params[0] || '';
   
-  if (fs.existsSync(buildPath)) {
-    // If it's a frontend project, we serve the static files
-    // In a real monorepo, we might need to check for /dist or /build
-    express.static(buildPath)(req, res, next);
-  } else {
-    res.status(404).send('Project build not found or expired.');
+  // Base path where the repo was cloned
+  const rootPath = path.join(process.cwd(), 'temp-builds', id);
+  
+  if (!fs.existsSync(rootPath)) {
+    return res.status(404).send('<h1>Deployment not found</h1><p>The build files for this deployment are missing or have been cleared.</p>');
   }
+
+  // Smart Detection: Check common build output directories
+  const possiblePaths = [
+    rootPath,
+    path.join(rootPath, 'dist'),
+    path.join(rootPath, 'build'),
+    path.join(rootPath, 'public'),
+    path.join(rootPath, 'out'),
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      const fullFilePath = path.join(p, subPath);
+      
+      // If it's a directory, try to serve index.html
+      if (fs.existsSync(fullFilePath) && fs.lstatSync(fullFilePath).isDirectory()) {
+        const indexFile = path.join(fullFilePath, 'index.html');
+        if (fs.existsSync(indexFile)) {
+          return res.sendFile(indexFile);
+        }
+      } 
+      
+      // If it's a file, serve it
+      if (fs.existsSync(fullFilePath) && !fs.lstatSync(fullFilePath).isDirectory()) {
+        return res.sendFile(fullFilePath);
+      }
+    }
+  }
+
+  // If we reach here, we didn't find the specific file, try to serve root index.html as fallback (for SPAs)
+  for (const p of possiblePaths) {
+    const indexFile = path.join(p, 'index.html');
+    if (fs.existsSync(indexFile)) {
+      return res.sendFile(indexFile);
+    }
+  }
+
+  res.status(404).send('<h1>File not found</h1><p>We could not find an index.html or the requested file in your project folders.</p>');
 });
 
 app.get('/health', (req, res) => {
