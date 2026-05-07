@@ -15,6 +15,8 @@ import { useState } from 'react';
 
 export default function ImportProjectPage() {
   const [url, setUrl] = useState('');
+  const [branch, setBranch] = useState('main');
+  const [rootDirectory, setRootDirectory] = useState('./');
   const [loading, setLoading] = useState(false);
   const [envVars, setEnvVars] = useState([{ key: '', value: '' }]);
   const router = useRouter();
@@ -46,6 +48,8 @@ export default function ImportProjectPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           repoUrl: url,
+          branch,
+          rootDirectory,
           envVars: envVars.filter(v => v.key && v.value)
         }),
       });
@@ -101,7 +105,8 @@ export default function ImportProjectPage() {
             </div>
             <input 
               type="text" 
-              defaultValue="main" 
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
               className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
               placeholder="main"
             />
@@ -113,9 +118,10 @@ export default function ImportProjectPage() {
             </div>
             <input 
               type="text" 
-              defaultValue="./" 
+              value={rootDirectory}
+              onChange={(e) => setRootDirectory(e.target.value)}
               className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
-              placeholder="/ (Root)"
+              placeholder="./"
             />
           </div>
         </div>
