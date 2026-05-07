@@ -5,20 +5,7 @@ import { Framework, RepoProvider } from '@prisma/client';
 
 export const triggerDeploy = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { repoUrl } = req.body;
-    const userId = (req as any).user?.userId || (await prisma.user.findFirst())?.id;
 
-    if (!userId) {
-        return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    // 1. Find or create a team
-    let team = await prisma.team.findFirst({ where: { ownerId: userId } });
-    if (!team) {
-      team = await prisma.team.create({
-        data: { name: 'Personal Team', slug: `personal-${Date.now()}`, ownerId: userId }
-      });
-    }
 
     // 2. Find or create a project
     let project = await prisma.project.findFirst({ where: { repoUrl } });
