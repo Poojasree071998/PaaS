@@ -18,6 +18,7 @@ export default function ImportProjectPage() {
   const [url, setUrl] = useState('');
   const [branch, setBranch] = useState('main');
   const [rootDirectory, setRootDirectory] = useState('./');
+  const [buildCommand, setBuildCommand] = useState('npm run build');
   const [loading, setLoading] = useState(false);
   const [envVars, setEnvVars] = useState([{ key: '', value: '' }]);
   const router = useRouter();
@@ -50,6 +51,7 @@ export default function ImportProjectPage() {
           repoUrl: url,
           branch,
           rootDirectory,
+          buildCommand,
           envVars: envVars.filter(v => v.key && v.value)
         }),
         signal: controller.signal
@@ -107,7 +109,7 @@ export default function ImportProjectPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2 focus-within:border-white/20 transition-colors">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
               <GitBranch className="w-3.5 h-3.5" />
@@ -132,6 +134,19 @@ export default function ImportProjectPage() {
               onChange={(e) => setRootDirectory(e.target.value)}
               className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
               placeholder="./"
+            />
+          </div>
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2 focus-within:border-white/20 transition-colors">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
+              <Zap className="w-3.5 h-3.5" />
+              Build Command
+            </div>
+            <input 
+              type="text" 
+              value={buildCommand}
+              onChange={(e) => setBuildCommand(e.target.value)}
+              className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
+              placeholder="npm run build"
             />
           </div>
         </div>

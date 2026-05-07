@@ -5,7 +5,7 @@ import { Framework, RepoProvider } from '@prisma/client';
 
 export const triggerDeploy = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { repoUrl } = req.body;
+    const { repoUrl, buildCommand, branch, rootDirectory } = req.body;
     
     // 1. Get or create a default user for the demo
     let user = await prisma.user.findFirst();
@@ -42,12 +42,25 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
           framework: Framework.NEXTJS,
           teamId: team.id,
           userId,
+          buildCommand: buildCommand || 'npm run build',
+          repoBranch: branch || 'main',
+          rootDirectory: rootDirectory || '/'
+        }
+      });
+    } else {
+      // Update existing project with new settings if provided
+      project = await prisma.project.update({
+        where: { id: project.id },
+        data: {
+          buildCommand: buildCommand || project.buildCommand,
+          repoBranch: branch || project.repoBranch,
+          rootDirectory: rootDirectory || project.rootDirectory
         }
       });
     }
 
     // 4. Trigger build
-    const deployment = await BuildService.triggerBuild(project.id, userId);
+    const deployment = await BuildService.triggerBuild(project.id, userId, branch || project.repoBranch);
 
     res.json({ success: true, data: deployment });
   } catch (error) {
