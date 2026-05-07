@@ -10,7 +10,9 @@ import {
   Terminal,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Settings,
+  Folder
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -33,7 +35,10 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const apiUrl = `http://${window.location.hostname}:4000`;
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
+        if (!apiUrl.startsWith('http')) apiUrl = `https://${apiUrl}`;
+        if (!apiUrl.includes('.')) apiUrl = `${apiUrl}.onrender.com`;
+
         const [depRes, logsRes] = await Promise.all([
           fetch(`${apiUrl}/api/deployments/${id}`),
           fetch(`${apiUrl}/api/deployments/${id}/logs`)
@@ -63,7 +68,10 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
 
     fetchData();
 
-    const socketUrl = typeof window !== 'undefined' ? `http://${window.location.hostname}:4000` : 'http://localhost:4000';
+    let socketUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
+    if (!socketUrl.startsWith('http')) socketUrl = `https://${socketUrl}`;
+    if (!socketUrl.includes('.')) socketUrl = `${socketUrl}.onrender.com`;
+
     const socket = io(socketUrl);
     socket.emit('join:deployment', id);
 
@@ -112,7 +120,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
             <span>/</span>
             <span className="flex items-center gap-1"><Hash className="w-3 h-3" /> {id.substring(0, 8)}</span>
           </div>
-          <h1 className="text-2xl font-bold">Manual Deployment</h1>
+          <h1 className="text-2xl font-bold">Deployment Pipeline</h1>
         </div>
         <div className="ml-auto flex gap-3">
           {status === 'READY' && (
@@ -125,9 +133,6 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
               Visit Site <ExternalLink className="w-4 h-4" />
             </a>
           )}
-          <button className="bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg text-sm transition-colors border border-white/5">
-            Redeploy
-          </button>
         </div>
       </div>
 
@@ -147,8 +152,28 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium text-zinc-500">Duration</p>
-              <p className="text-2xl font-mono text-white">01:24</p>
+              <p className="text-sm font-medium text-zinc-500">Infrastructure</p>
+              <p className="text-lg font-mono text-white">Render PaaS</p>
+            </div>
+          </div>
+
+          {/* Build Info Section */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="glass-card p-4 border-white/5">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-2 flex items-center gap-2">
+                <Settings className="w-3 h-3" /> Build Command
+              </p>
+              <p className="font-mono text-xs bg-black/40 p-2 rounded border border-white/5 text-zinc-300">
+                {deployment?.project?.buildCommand || 'npm run build'}
+              </p>
+            </div>
+            <div className="glass-card p-4 border-white/5">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-2 flex items-center gap-2">
+                <Folder className="w-3 h-3" /> Root Directory
+              </p>
+              <p className="font-mono text-xs bg-black/40 p-2 rounded border border-white/5 text-zinc-300">
+                {deployment?.project?.rootDirectory || './'}
+              </p>
             </div>
           </div>
 
@@ -188,23 +213,23 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
 
         <div className="space-y-6">
           <div className="glass-card p-6 space-y-6 border-white/5">
-            <h3 className="font-semibold text-sm uppercase tracking-widest text-zinc-500 border-b border-white/5 pb-4">Deployment Details</h3>
+            <h3 className="font-semibold text-sm uppercase tracking-widest text-zinc-500 border-b border-white/5 pb-4">Deployment Metadata</h3>
             <div className="space-y-6">
               <div>
                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Branch</p>
                 <div className="flex items-center gap-2 text-sm text-white font-medium">
-                  <GitBranch className="w-4 h-4 text-zinc-500" /> {deployment?.branch || 'main'}
+                  <GitBranch className="w-4 h-4 text-zinc-500" /> {deployment?.project?.branch || 'main'}
                 </div>
               </div>
               <div>
-                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Commit</p>
-                <div className="flex items-center gap-2 text-sm font-mono text-zinc-400">
-                  <Hash className="w-3.5 h-3.5" /> 7f2a1b9
+                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Repository URL</p>
+                <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 break-all bg-white/5 p-2 rounded">
+                  {deployment?.project?.repoUrl || 'Fetching...'}
                 </div>
               </div>
               <div>
                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Environment</p>
-                <span className="inline-flex text-sm bg-white/5 text-white px-2 py-1 rounded text-[10px] font-bold border border-white/10 uppercase tracking-widest">
+                <span className="inline-flex text-sm bg-blue-500/10 text-blue-400 px-2 py-1 rounded text-[10px] font-bold border border-blue-500/20 uppercase tracking-widest">
                   Production
                 </span>
               </div>
