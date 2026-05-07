@@ -24,13 +24,23 @@ export default function DeploymentsPage() {
     const fetchDeployments = async () => {
       try {
         const apiUrl = getApiUrl();
-        const response = await fetch(`${apiUrl}/api/deployments`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+        const response = await fetch(`${apiUrl}/api/deployments`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
         const data = await response.json();
         if (data.success) {
           setDeployments(data.data);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch deployments:', error);
+        if (error.name === 'AbortError') {
+          console.warn('Deployment fetch timed out');
+        }
       } finally {
         setLoading(false);
       }
