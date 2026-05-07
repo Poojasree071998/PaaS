@@ -56,9 +56,9 @@ export class BuildService {
       }
 
       // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `📦 [2/3] Installing dependencies (Memory Optimized)...`, LogLevel.INFO);
-      // Added --prefer-offline and --no-package-lock to save RAM on Render
-      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund', '--loglevel', 'info', '--prefer-offline', '--no-package-lock'], workingDir, 600000); 
+      await this.log(deploymentId, `📦 [2/3] Installing Production Dependencies...`, LogLevel.INFO);
+      // Use --omit=dev to skip unnecessary packages and save RAM/Time
+      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, 600000); 
       
       await this.log(deploymentId, `🔨 [3/3] Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');

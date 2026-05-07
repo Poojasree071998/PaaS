@@ -135,7 +135,10 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-6">
           {/* Status Header */}
-          <div className="glass-card p-6 flex items-center justify-between border-white/5">
+          <div className={cn(
+            "glass-card p-6 flex items-center justify-between border-white/5 transition-all duration-500",
+            status === 'READY' && "bg-emerald-500/5 border-emerald-500/20"
+          )}>
             <div className="flex items-center gap-4">
               {(status === 'BUILDING' || status === 'QUEUED') && <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />}
               {status === 'READY' && <CheckCircle2 className="w-8 h-8 text-emerald-500" />}
@@ -143,11 +146,23 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
               <div>
                 <h3 className="font-semibold text-lg tracking-tight">{status}</h3>
                 <p className="text-sm text-zinc-500">
-                  {status === 'READY' ? 'Deployment is ready for production.' : 'Your project is being prepared...'}
+                  {status === 'READY' ? 'Deployment is live and accessible!' : 'Your project is being prepared...'}
                 </p>
+                {status === 'READY' && deployment?.url && (
+                  <div className="mt-3 flex items-center gap-3">
+                    <a 
+                      href={deployment.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs font-mono text-emerald-400 hover:underline flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded"
+                    >
+                      {deployment.url} <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-zinc-500">Infrastructure</p>
               <p className="text-lg font-mono text-white">Render PaaS</p>
             </div>
