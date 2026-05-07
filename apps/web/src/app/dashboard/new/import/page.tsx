@@ -16,7 +16,44 @@ import { useState } from 'react';
 export default function ImportProjectPage() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [envVars, setEnvVars] = useState([{ key: '', value: '' }]);
+  const router = useRouter();
 
+  const addEnvVar = () => {
+    setEnvVars([...envVars, { key: '', value: '' }]);
+  };
+
+  const updateEnvVar = (index: number, field: 'key' | 'value', value: string) => {
+    const newVars = [...envVars];
+    newVars[index][field] = value;
+    setEnvVars(newVars);
+  };
+
+  const handleDeploy = async () => {
+    if (!url) return;
+    setLoading(true);
+    
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || `https://deployflow-api.onrender.com`;
+      const response = await fetch(`${apiUrl}/api/deployments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          repoUrl: url,
+          envVars: envVars.filter(v => v.key && v.value)
+        }),
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        router.push(`/dashboard/deployments/${data.data.id}`);
+      }
+    } catch (error) {
+      console.error('Deployment failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 py-10">
@@ -79,7 +116,42 @@ export default function ImportProjectPage() {
 
         <div className="space-y-4 pt-4 border-t border-white/5">
           <div className="flex items-center justify-between">
-
+            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+              <Settings className="w-3.5 h-3.5" />
+              Environment Variables
+            </h3>
+            <button 
+              type="button"
+              onClick={addEnvVar}
+              className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest"
+            >
+              + Add Variable
+            </button>
+          </div>
+          <div className="space-y-2">
+            {envVars.map((v, i) => (
+              <div key={i} className="grid grid-cols-2 gap-2">
+                <input 
+                  type="text" 
+                  placeholder="VARIABLE_NAME" 
+                  value={v.key}
+                  onChange={(e) => updateEnvVar(i, 'key', e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
+                />
+                <input 
+                  type="text" 
+                  placeholder="value" 
+                  value={v.value}
+                  onChange={(e) => updateEnvVar(i, 'value', e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-zinc-500 italic">
+            Tip: Backend services use these variables to connect to databases and external APIs.
+          </p>
+        </div>
 
         <button 
           onClick={handleDeploy}

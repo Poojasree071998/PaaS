@@ -5,9 +5,30 @@ import { Framework, RepoProvider } from '@prisma/client';
 
 export const triggerDeploy = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { repoUrl } = req.body;
+    
+    // 1. Get or create a default user for the demo
+    let user = await prisma.user.findFirst();
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: 'admin@deployflow.app',
+          name: 'Admin User',
+          password: 'demo-only',
+        }
+      });
+    }
+    const userId = user.id;
 
+    // 2. Find or create a team
+    let team = await prisma.team.findFirst({ where: { ownerId: userId } });
+    if (!team) {
+      team = await prisma.team.create({
+        data: { name: 'Personal Team', slug: `personal-${Date.now()}`, ownerId: userId }
+      });
+    }
 
-    // 2. Find or create a project
+    // 3. Find or create a project
     let project = await prisma.project.findFirst({ where: { repoUrl } });
     if (!project) {
       const name = repoUrl.split('/').pop() || 'new-project';
@@ -25,7 +46,7 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
       });
     }
 
-    // 3. Trigger build
+    // 4. Trigger build
     const deployment = await BuildService.triggerBuild(project.id, userId);
 
     res.json({ success: true, data: deployment });
