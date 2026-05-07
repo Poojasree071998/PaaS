@@ -39,19 +39,17 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- SMART LIVE HOSTING ENGINE ---
-app.get('/live/:id*', (req, res, next) => {
+// --- SMART LIVE HOSTING ENGINE (TS FIXED) ---
+app.get('/live/:id/:subPath(*)?', (req, res) => {
   const { id } = req.params;
-  const subPath = req.params[0] || '';
+  const subPath = (req.params as any).subPath || '';
   
-  // Base path where the repo was cloned
   const rootPath = path.join(process.cwd(), 'temp-builds', id);
   
   if (!fs.existsSync(rootPath)) {
     return res.status(404).send('<h1>Deployment not found</h1><p>The build files for this deployment are missing or have been cleared.</p>');
   }
 
-  // Smart Detection: Check common build output directories
   const possiblePaths = [
     rootPath,
     path.join(rootPath, 'dist'),
@@ -64,7 +62,6 @@ app.get('/live/:id*', (req, res, next) => {
     if (fs.existsSync(p)) {
       const fullFilePath = path.join(p, subPath);
       
-      // If it's a directory, try to serve index.html
       if (fs.existsSync(fullFilePath) && fs.lstatSync(fullFilePath).isDirectory()) {
         const indexFile = path.join(fullFilePath, 'index.html');
         if (fs.existsSync(indexFile)) {
@@ -72,14 +69,12 @@ app.get('/live/:id*', (req, res, next) => {
         }
       } 
       
-      // If it's a file, serve it
       if (fs.existsSync(fullFilePath) && !fs.lstatSync(fullFilePath).isDirectory()) {
         return res.sendFile(fullFilePath);
       }
     }
   }
 
-  // If we reach here, we didn't find the specific file, try to serve root index.html as fallback (for SPAs)
   for (const p of possiblePaths) {
     const indexFile = path.join(p, 'index.html');
     if (fs.existsSync(indexFile)) {
