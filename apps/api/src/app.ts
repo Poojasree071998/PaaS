@@ -9,6 +9,7 @@ import { standardRateLimiter } from './middlewares/rateLimiter';
 import logger from './config/logger';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsDoc from 'swagger-jsdoc';
+import prisma from './config/prisma';
 
 import authRoutes from './routes/authRoutes';
 import teamRoutes from './routes/teamRoutes';
@@ -39,50 +40,80 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- SMART LIVE HOSTING ENGINE (TS FIXED) ---
-app.get('/live/:id/:subPath(*)?', (req, res) => {
+// --- PROJECT-AWARE LIVE HOSTING ENGINE ---
+app.get('/live/:id/:subPath(*)?', async (req, res) => {
   const { id } = req.params;
   const subPath = (req.params as any).subPath || '';
   
-  const rootPath = path.join(process.cwd(), 'temp-builds', id);
-  
-  if (!fs.existsSync(rootPath)) {
-    return res.status(404).send('<h1>Deployment not found</h1><p>The build files for this deployment are missing or have been cleared.</p>');
-  }
+  try {
+    // 1. Fetch deployment and project info to find the correct Root Directory
+    const deployment = await prisma.deployment.findUnique({
+      where: { id },
+      include: { project: true }
+    });
 
-  const possiblePaths = [
-    rootPath,
-    path.join(rootPath, 'dist'),
-    path.join(rootPath, 'build'),
-    path.join(rootPath, 'public'),
-    path.join(rootPath, 'out'),
-  ];
+    if (!deployment) {
+      return res.status(404).send('<h1>Deployment record not found</h1>');
+    }
 
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      const fullFilePath = path.join(p, subPath);
-      
-      if (fs.existsSync(fullFilePath) && fs.lstatSync(fullFilePath).isDirectory()) {
-        const indexFile = path.join(fullFilePath, 'index.html');
-        if (fs.existsSync(indexFile)) {
-          return res.sendFile(indexFile);
+    const buildRoot = path.join(process.cwd(), 'temp-builds', id);
+    if (!fs.existsSync(buildRoot)) {
+      return res.status(404).send('<h1>Deployment files missing</h1><p>The build files for this deployment are no longer available on this server.</p>');
+    }
+
+    // 2. Resolve the actual project folder (handling monorepos)
+    let projectPath = buildRoot;
+    if (deployment.project.rootDirectory && deployment.project.rootDirectory !== './') {
+      const cleanRoot = deployment.project.rootDirectory.replace(/^\.\//, '');
+      projectPath = path.join(buildRoot, cleanRoot);
+    }
+
+    // 3. Smart Detection of build output folders inside the project path
+    const searchFolders = [
+      projectPath,
+      path.join(projectPath, 'dist'),
+      path.join(projectPath, 'build'),
+      path.join(projectPath, 'public'),
+      path.join(projectPath, 'out'),
+    ];
+
+    for (const folder of searchFolders) {
+      if (fs.existsSync(folder)) {
+        const targetFile = path.join(folder, subPath);
+        
+        if (fs.existsSync(targetFile)) {
+          if (fs.lstatSync(targetFile).isDirectory()) {
+            const index = path.join(targetFile, 'index.html');
+            if (fs.existsSync(index)) return res.sendFile(index);
+          } else {
+            return res.sendFile(targetFile);
+          }
         }
-      } 
-      
-      if (fs.existsSync(fullFilePath) && !fs.lstatSync(fullFilePath).isDirectory()) {
-        return res.sendFile(fullFilePath);
       }
     }
-  }
 
-  for (const p of possiblePaths) {
-    const indexFile = path.join(p, 'index.html');
-    if (fs.existsSync(indexFile)) {
-      return res.sendFile(indexFile);
+    // 4. Fallback to index.html in any valid folder
+    for (const folder of searchFolders) {
+      const index = path.join(folder, 'index.html');
+      if (fs.existsSync(index)) return res.sendFile(index);
     }
-  }
 
-  res.status(404).send('<h1>File not found</h1><p>We could not find an index.html or the requested file in your project folders.</p>');
+    res.status(404).send(`
+      <div style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto; text-align: center;">
+        <h1 style="color: #ef4444;">Project Entry Point Not Found</h1>
+        <p style="color: #71717a;">We looked in your root and build folders (dist, build, public), but couldn't find an index.html file.</p>
+        <div style="background: #f4f4f5; padding: 20px; border-radius: 12px; text-align: left; font-family: monospace; font-size: 13px;">
+          <strong>Looked in:</strong><br/>
+          ${searchFolders.map(f => f.split('temp-builds')[1] || f).join('<br/>')}
+        </div>
+        <p style="margin-top: 20px; font-size: 14px;">Tip: Ensure your project has an index.html or that you've set the correct <strong>Root Directory</strong>.</p>
+      </div>
+    `);
+
+  } catch (error) {
+    logger.error('Hosting error:', error);
+    res.status(500).send('Internal Server Error during hosting.');
+  }
 });
 
 app.get('/health', (req, res) => {
