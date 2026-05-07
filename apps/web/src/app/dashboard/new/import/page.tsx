@@ -36,11 +36,16 @@ export default function ImportProjectPage() {
     setLoading(true);
     
     try {
-      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://deployflow-api.onrender.com';
+      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
       
-      // Ensure apiUrl is absolute
+      // 1. Add protocol if missing
       if (!apiUrl.startsWith('http')) {
         apiUrl = `https://${apiUrl}`;
+      }
+
+      // 2. Add domain if missing (Render property:host sometimes returns only service name)
+      if (!apiUrl.includes('.')) {
+        apiUrl = `${apiUrl}.onrender.com`;
       }
 
       const response = await fetch(`${apiUrl}/api/deployments`, {
@@ -60,6 +65,7 @@ export default function ImportProjectPage() {
       }
     } catch (error) {
       console.error('Deployment failed:', error);
+      alert(`Deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please check if the API is awake at https://deployflow-api.onrender.com`);
     } finally {
       setLoading(false);
     }
