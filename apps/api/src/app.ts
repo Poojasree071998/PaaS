@@ -35,7 +35,7 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health Check
+
 app.get('/health', (req, res) => {
   res.json({ success: true, status: 'UP' });
 });
