@@ -24,10 +24,25 @@ services:
       - key: ENCRYPTION_MASTER_KEY
         generateValue: true
 
+  - type: web
+    name: deployflow-web
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build -w web
+    startCommand: npm run start -w web
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: deployflow-api
+          type: web
+          property: host
+
   - type: redis
     name: deployflow-redis
     plan: free
-    ipAllowList: [] # Allow connections from all services in this blueprint
+    ipAllowList: []
 
 databases:
   - name: deployflow-db
