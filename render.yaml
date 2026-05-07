@@ -24,10 +24,11 @@ services:
       - key: ENCRYPTION_MASTER_KEY
         generateValue: true
 
+  - type: redis
+    name: deployflow-redis
+    plan: free
+    ipAllowList: [] # Allow connections from all services in this blueprint
+
 databases:
   - name: deployflow-db
-    plan: free
-
-redis:
-  - name: deployflow-redis
     plan: free
