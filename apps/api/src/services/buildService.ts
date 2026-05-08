@@ -63,6 +63,7 @@ export class BuildService {
         await fsPromises.rm(buildDir, { recursive: true, force: true }).catch(() => {});
       }
       
+      await fsPromises.mkdir(buildDir, { recursive: true });
       await this.log(deploymentId, `[1/4] 📥 Cloning repository...`, LogLevel.INFO);
       const git = simpleGit({ baseDir: buildDir, binary: 'git' });
       await git.clone(deployment.project.repoUrl, '.', ['--depth', '1']);
