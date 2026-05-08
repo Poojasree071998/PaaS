@@ -35,8 +35,8 @@ export const getProject = async (req: Request, res: Response, next: NextFunction
 
 export const updateProject = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // mock
-    res.json({ success: true, message: 'Project updated (mock)' });
+    const updated = await ProjectService.updateProject(req.params.projectId, req.user!.id, req.body);
+    res.json({ success: true, data: updated });
   } catch (error) {
     next(error);
   }
@@ -44,8 +44,8 @@ export const updateProject = async (req: Request, res: Response, next: NextFunct
 
 export const deleteProject = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // mock
-    res.json({ success: true, message: 'Project deleted (mock)' });
+    await ProjectService.deleteProject(req.params.projectId, req.user!.id);
+    res.json({ success: true, message: 'Project deleted' });
   } catch (error) {
     next(error);
   }

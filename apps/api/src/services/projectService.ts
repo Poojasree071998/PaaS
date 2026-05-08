@@ -68,4 +68,51 @@ export class ProjectService {
       include: { _count: { select: { deployments: true, domains: true } } }
     });
   }
+
+  static async updateProject(projectId: string, userId: string, data: any) {
+    const project = await this.getProject(projectId, userId);
+
+    const { envVars, ...rest } = data;
+
+    // Update main project fields
+    const updated = await prisma.project.update({
+      where: { id: projectId },
+      data: rest
+    });
+
+    // Update Environment Variables if provided
+    if (envVars && Array.isArray(envVars)) {
+      // For simplicity, we'll replace them all or update matches
+      // A more robust way would be to diff them, but for now we'll do a simple upsert
+      for (const env of envVars) {
+        await prisma.environmentVariable.upsert({
+          where: {
+            projectId_key_environment: {
+              projectId,
+              key: env.key,
+              environment: env.environment || 'ALL'
+            }
+          },
+          update: { value: env.value },
+          create: {
+            projectId,
+            teamId: project.teamId,
+            key: env.key,
+            value: env.value,
+            environment: env.environment || 'ALL'
+          }
+        });
+      }
+    }
+
+    return updated;
+  }
+
+  static async deleteProject(projectId: string, userId: string) {
+    await this.getProject(projectId, userId);
+    
+    return prisma.project.delete({
+      where: { id: projectId }
+    });
+  }
 }
