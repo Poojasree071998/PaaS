@@ -125,7 +125,7 @@ export class BuildService {
       });
 
       const env: Record<string, string> = {
-        NODE_ENV: 'production',
+        NODE_ENV: 'development', // Must be development during build to install devDependencies (Vite, etc)
         PORT: '3000',
         ...Object.fromEntries(deployment.project.envVars.map((v: any) => [v.key, v.value])),
       };
@@ -173,7 +173,7 @@ export class BuildService {
         await this.executeLiveCommand(
           deploymentId, 
           'npm', 
-          ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'error'], 
+          ['install', '--include=dev', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'error'], 
           workingDir, 
           env, 
           1200000
