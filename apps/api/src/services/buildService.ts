@@ -186,7 +186,7 @@ export class BuildService {
       // --- MAGIC CODE PATCHER (Zero-Config DB) ---
       try {
         await this.patchHardcodedLinks(workingDir, deploymentId);
-      } catch (e) {
+      } catch (e: any) {
         await this.log(deploymentId, `⚠️ Code patching skipped: ${e.message}`, LogLevel.WARN);
       }
 
