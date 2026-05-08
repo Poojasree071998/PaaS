@@ -44,8 +44,14 @@ export default function ImportProjectPage() {
         setAnalysis(data.data);
         setBuildCommand(data.data.buildCommand);
         setRootDirectory(data.data.rootDirectory);
-        // Pre-fill required env vars
-        setEnvVars(data.data.requiredEnvVars.map((k: string) => ({ key: k, value: '' })));
+        
+        // Pre-fill required env vars with values from detected .env files
+        const combinedVars = data.data.requiredEnvVars.map((k: string) => ({
+          key: k,
+          value: data.data.detectedEnv[k] || '' // Auto-fill if found, otherwise empty
+        }));
+        setEnvVars(combinedVars);
+        
         setName(url.split('/').pop() || 'my-project');
         setStep(2);
       } else {

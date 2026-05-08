@@ -12,6 +12,7 @@ export interface AnalysisResult {
   startCommand: string;
   rootDirectory: string;
   requiredEnvVars: string[];
+  detectedEnv: Record<string, string>; // Added to store key-value pairs from .env
   databaseRequired: 'MONGODB' | 'POSTGRES' | 'REDIS' | 'NONE';
 }
 
@@ -34,6 +35,7 @@ export class AnalysisService {
         startCommand: 'npm start',
         rootDirectory: '/',
         requiredEnvVars: [],
+        detectedEnv: {}, // Initialize empty
         databaseRequired: 'NONE'
       };
 
@@ -71,16 +73,24 @@ export class AnalysisService {
       const systemManaged = ['BACKEND_URL', 'API_URL', 'NEXT_PUBLIC_API_URL', 'VITE_API_BASE'];
       result.requiredEnvVars = result.requiredEnvVars.filter(v => !systemManaged.includes(v));
 
-      // 4. Also check .env.example if it exists
-      const envExamplePath = path.join(tempDir, '.env.example');
-      if (fs.existsSync(envExamplePath)) {
-        const content = await fsPromises.readFile(envExamplePath, 'utf8');
-        content.split('\n').forEach(line => {
-          const match = line.match(/^([A-Z0-9_]+)=/);
-          if (match && !result.requiredEnvVars.includes(match[1])) {
-            result.requiredEnvVars.push(match[1]);
-          }
-        });
+      // 5. Detect and Parse .env files
+      const envFiles = ['.env', '.env.local', '.env.production', '.env.development'];
+      for (const envFile of envFiles) {
+        const envPath = path.join(tempDir, envFile);
+        if (fs.existsSync(envPath)) {
+          const content = await fsPromises.readFile(envPath, 'utf8');
+          content.split('\n').forEach(line => {
+            const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+            if (match) {
+              const key = match[1];
+              const value = match[2].replace(/['"]/g, '').trim();
+              if (key && value) {
+                result.detectedEnv[key] = value;
+                if (!result.requiredEnvVars.includes(key)) result.requiredEnvVars.push(key);
+              }
+            }
+          });
+        }
       }
 
       return result;
