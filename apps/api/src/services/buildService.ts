@@ -171,11 +171,11 @@ export class BuildService {
       }
 
       if (shouldInstall) {
-        await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies...`, LogLevel.INFO);
+        await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies (First build may take 2-3 minutes)...`, LogLevel.INFO);
         await this.executeLiveCommand(
           deploymentId, 
           'npm', 
-          ['install', '--include=dev', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'error'], 
+          ['install', '--include=dev', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'info'], 
           workingDir, 
           env, 
           1200000
