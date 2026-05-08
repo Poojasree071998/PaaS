@@ -126,6 +126,25 @@ export class BuildService {
         await this.log(deploymentId, `⚠️ No databases linked to this project. Please link a database in the 'Databases' tab to enable automatic cloud connection.`, LogLevel.WARN);
       }
 
+      // --- INTELLIGENT AUTO-CONFIG ---
+      const pkgPath = path.join(buildDir, 'package.json');
+      let buildCommand = deployment.project.buildCommand;
+      
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        
+        // Auto-detect Build Command
+        if (!buildCommand || buildCommand === 'npm run build') {
+          if (pkg.scripts?.build) buildCommand = 'npm run build';
+          else if (pkg.scripts?.compile) buildCommand = 'npm run compile';
+          else await this.log(deploymentId, `ℹ️ No build script found. Skipping build step.`, LogLevel.INFO);
+        }
+
+        // Auto-detect Framework for UI
+        if (pkg.dependencies?.next) await this.log(deploymentId, `🚀 Smart-Detect: Next.js project identified.`, LogLevel.INFO);
+        else if (pkg.devDependencies?.vite) await this.log(deploymentId, `⚡ Smart-Detect: Vite project identified.`, LogLevel.INFO);
+      }
+
       const env: Record<string, string> = {
         NODE_ENV: 'development', // Must be development during build to install devDependencies (Vite, etc)
         PORT: '3000',
