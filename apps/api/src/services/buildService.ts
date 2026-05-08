@@ -101,13 +101,26 @@ export class BuildService {
 
       if (fs.existsSync(cacheDir)) {
         await this.log(deploymentId, `♻️ Restoring build cache for faster deployment...`, LogLevel.INFO);
+        if (!fs.existsSync(targetModules)) fs.mkdirSync(targetModules, { recursive: true });
         // Using shell command to copy quickly
-        await this.executeLiveCommand(deploymentId, 'cp', ['-r', `${cacheDir}/.`, targetModules], workingDir, {}, 60000).catch(() => {});
+        await this.executeLiveCommand(deploymentId, 'cp', ['-rn', `${cacheDir}/.`, targetModules], workingDir, {}, 60000).catch(() => {});
       }
 
       // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `[2/4] 📦 Installing dependencies...`, LogLevel.INFO);
-      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, { NODE_ENV: 'development' }, 1200000); // 20 min timeout
+      await this.log(deploymentId, `[2/4] 📦 Installing dependencies (optimized)...`, LogLevel.INFO);
+      
+      // Use 'npm ci' if lockfile exists for 2x speed, otherwise 'npm install'
+      const hasLockFile = fs.existsSync(path.join(workingDir, 'package-lock.json'));
+      const installCmd = hasLockFile ? 'ci' : 'install';
+      
+      await this.executeLiveCommand(
+        deploymentId, 
+        'npm', 
+        [installCmd, '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'info'], 
+        workingDir, 
+        { NODE_ENV: 'development' }, 
+        1200000
+      ); // 20 min timeout
 
       // --- SAVE CACHE ---
       await this.log(deploymentId, `💾 Saving build cache for future use...`, LogLevel.INFO);
