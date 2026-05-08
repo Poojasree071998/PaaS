@@ -7,6 +7,9 @@ import prisma from '../config/prisma';
 import logger from '../config/logger';
 import { DeploymentStatus, LogLevel } from '@prisma/client';
 import { getIO } from '../config/socket';
+import { Framework } from '@prisma/client';
+
+const runningProcesses = new Map<string, any>(); // deploymentId -> { process, port }
 
 export class BuildService {
   static async triggerBuild(projectId: string, userId: string, branch: string = 'main') {
@@ -103,6 +106,36 @@ export class BuildService {
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.READY);
 
+      // --- BACKEND EXECUTION ENGINE ---
+      const backendFrameworks: string[] = [Framework.EXPRESS, Framework.FASTAPI, Framework.DJANGO, Framework.RAILS, Framework.LARAVEL, Framework.NEXTJS];
+      if (backendFrameworks.includes(deployment.project.framework as string)) {
+        await this.log(deploymentId, `🚀 Starting Backend Process...`, LogLevel.INFO);
+        
+        // Assign a random free port (3001-9999)
+        const port = Math.floor(Math.random() * 7000) + 3000;
+        
+        const startCmd = (deployment.project as any).startCommand || 'npm start';
+        const [cmd, ...args] = startCmd.split(' ');
+
+        const child = spawn(cmd, args, {
+          cwd: workingDir,
+          shell: true,
+          env: { ...process.env, PORT: port.toString(), NODE_ENV: 'production' }
+        });
+
+        runningProcesses.set(deploymentId, { process: child, port });
+
+        child.stdout.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.INFO));
+        child.stderr.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.WARN));
+
+        await prisma.deployment.update({
+          where: { id: deploymentId },
+          data: { meta: { port } }
+        });
+
+        await this.log(deploymentId, `🟢 Backend running on port ${port}`, LogLevel.INFO);
+      }
+
       await this.log(deploymentId, `✨ SUCCESS! Live at: ${projectUrl}`, LogLevel.INFO);
     } catch (error: any) {
       logger.error(`Build failed:`, error);
@@ -194,5 +227,9 @@ export class BuildService {
         timestamp: log.timestamp,
       });
     } catch (e) {}
+  }
+
+  static getRunningPort(deploymentId: string): number | null {
+    return runningProcesses.get(deploymentId)?.port || null;
   }
 }

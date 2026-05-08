@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
+import { BuildService } from './services/buildService';
 import { errorHandler } from './middlewares/errorHandler';
 import { standardRateLimiter } from './middlewares/rateLimiter';
 import logger from './config/logger';
@@ -58,6 +60,29 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       return res.status(404).send('<h1>Deployment record not found</h1>');
     }
 
+    // --- REVERSE PROXY FOR BACKENDS ---
+    const runningPort = (deployment.meta as any)?.port || BuildService.getRunningPort(id);
+    if (runningPort) {
+      const proxyReq = http.request({
+        host: 'localhost',
+        port: runningPort,
+        path: '/' + subPath,
+        method: req.method,
+        headers: { ...req.headers, host: 'localhost:' + runningPort }
+      }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+
+      proxyReq.on('error', (err) => {
+        logger.error('Proxy error:', err);
+        res.status(502).send('<h1>Bad Gateway</h1><p>The backend process is not responding.</p>');
+      });
+
+      req.pipe(proxyReq);
+      return;
+    }
+
     const buildRoot = path.join(process.cwd(), 'temp-builds', id);
     if (!fs.existsSync(buildRoot)) {
       return res.status(404).send('<h1>Deployment files missing</h1><p>The build files for this deployment are no longer available on this server.</p>');
@@ -100,7 +125,7 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       }
     }
 
-    // 4. Fallback to index.html in any valid folder
+    // 4. Fallback to index.html in any valid folder (SPA Routing)
     for (const folder of searchFolders) {
       const index = path.join(folder, 'index.html');
       if (fs.existsSync(index)) {
@@ -116,6 +141,21 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
           html = baseTag + html;
         }
         
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(html);
+      }
+    }
+
+    // --- SPA CATCH-ALL ---
+    // If we are here, it means it's a deep-link for an SPA (e.g. /live/id/dashboard)
+    // We should try to serve the root index.html
+    for (const folder of [projectPath, path.join(projectPath, 'dist'), path.join(projectPath, 'build'), path.join(projectPath, 'public')]) {
+      const index = path.join(folder, 'index.html');
+      if (fs.existsSync(index)) {
+        let html = fs.readFileSync(index, 'utf8');
+        const baseTag = `<base href="/live/${id}/">`;
+        html = html.replace('<head>', `<head>\n    ${baseTag}`);
+        res.setHeader('Content-Type', 'text/html');
         return res.send(html);
       }
     }
