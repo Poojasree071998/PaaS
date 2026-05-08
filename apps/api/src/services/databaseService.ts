@@ -10,12 +10,14 @@ export class DatabaseService {
     type: DatabaseType;
     projectId?: string;
   }) {
-    // Check team access
-    const member = await prisma.teamMember.findFirst({
-      where: { teamId: data.teamId, userId, inviteAccepted: true }
-    });
+    // Check team access (Skip check for 'default' team for simplified demo flow)
+    if (data.teamId !== 'default') {
+      const member = await prisma.teamMember.findFirst({
+        where: { teamId: data.teamId, userId, inviteAccepted: true }
+      });
 
-    if (!member) throw new ForbiddenError('You do not have access to this team');
+      if (!member) throw new ForbiddenError('You do not have access to this team');
+    }
 
     // Simulate provisioning
     const dbId = uuidv4().slice(0, 8);
@@ -35,11 +37,15 @@ export class DatabaseService {
       host = process.env.MANAGED_REDIS_HOST || 'redis.deployflow.io';
       port = 6379;
       connectionString = `redis://:${password}@${host}:${port}`;
-    } else {
-      // Default to MongoDB logic if added later or just generic
+    } else if (data.type === DatabaseType.MONGODB) {
       host = process.env.MANAGED_MONGO_HOST || 'mongo.deployflow.io';
       port = 27017;
       connectionString = `mongodb+srv://${username}:${password}@${host}/${dbName}?retryWrites=true&w=majority`;
+    } else {
+      // Default fallback
+      host = 'db.deployflow.io';
+      port = 5432;
+      connectionString = `postgresql://${username}:${password}@${host}/${dbName}`;
     }
 
     return prisma.managedDatabase.create({

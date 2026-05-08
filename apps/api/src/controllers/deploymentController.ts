@@ -70,9 +70,21 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
 
 export const listDeployments = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Proactive Cleanup: Mark builds as ERROR if they've been BUILDING for more than 30 mins
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+    await prisma.deployment.updateMany({
+      where: { status: 'BUILDING', updatedAt: { lt: thirtyMinsAgo } },
+      data: { status: 'ERROR', errorMessage: 'Build timed out (Stuck)' }
+    });
+
     const deployments = await prisma.deployment.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { project: true }
+      include: { 
+        project: {
+          select: { name: true, repoUrl: true, framework: true }
+        }
+      },
+      take: 50
     });
     res.json({ success: true, data: deployments });
   } catch (error) {
