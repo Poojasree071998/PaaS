@@ -156,16 +156,20 @@ export class BuildService {
       // --- LIGHTNING-FAST INSTALL ENGINE ---
       const pkgPath = path.join(workingDir, 'package.json');
       const hashFile = path.join(workingDir, '.last-install-hash');
+      const modulesPath = path.join(workingDir, 'node_modules');
       
       let shouldInstall = true;
-      if (fs.existsSync(pkgPath) && fs.existsSync(path.join(workingDir, 'node_modules'))) {
+      // Rigorous check: Hash must match AND node_modules must exist AND not be empty
+      if (fs.existsSync(pkgPath) && fs.existsSync(modulesPath)) {
         const currentHash = require('crypto').createHash('md5').update(fs.readFileSync(pkgPath)).digest('hex');
         const lastHash = fs.existsSync(hashFile) ? fs.readFileSync(hashFile, 'utf8') : '';
+        const modulesExist = fs.readdirSync(modulesPath).length > 5; // Basic check for meaningful content
         
-        if (currentHash === lastHash) {
-          await this.log(deploymentId, `⚡ Fast-Track: package.json unchanged. Skipping install phase!`, LogLevel.INFO);
+        if (currentHash === lastHash && modulesExist) {
+          await this.log(deploymentId, `⚡ Fast-Track: dependencies verified. Skipping install phase!`, LogLevel.INFO);
           shouldInstall = false;
         } else {
+          await this.log(deploymentId, `📦 Cache stale or incomplete. Preparing fresh install...`, LogLevel.INFO);
           fs.writeFileSync(hashFile, currentHash);
         }
       }
