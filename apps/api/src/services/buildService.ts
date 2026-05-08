@@ -82,54 +82,36 @@ export class BuildService {
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.BUILDING);
 
-      // Clean up existing directory if any (ensures fresh recovery)
-      if (fs.existsSync(buildDir)) {
-        await fsPromises.rm(buildDir, { recursive: true, force: true }).catch(() => {});
-      }
-      
-      await fsPromises.mkdir(buildDir, { recursive: true });
-      await this.log(deploymentId, `[1/4] 📥 Cloning repository...`, LogLevel.INFO);
+      await this.log(deploymentId, `[1/4] 📥 Fetching updates...`, LogLevel.INFO);
       const git = simpleGit({ baseDir: buildDir, binary: 'git' });
-      await git.clone(deployment.project.repoUrl, '.', ['--depth', '1']);
-      await this.log(deploymentId, `✅ Repository cloned.`, LogLevel.INFO);
+      
+      if (fs.existsSync(path.join(buildDir, '.git'))) {
+        await this.log(deploymentId, `♻️ Project folder exists, pulling latest changes...`, LogLevel.INFO);
+        await git.fetch();
+        await git.reset(['--hard', `origin/${deployment.branch}`]);
+        await this.log(deploymentId, `✅ Project updated via incremental pull.`, LogLevel.INFO);
+      } else {
+        await fsPromises.mkdir(buildDir, { recursive: true });
+        await git.clone(deployment.project.repoUrl, '.', ['--depth', '1', '-b', deployment.branch]);
+        await this.log(deploymentId, `✅ Fresh repository cloned.`, LogLevel.INFO);
+      }
 
       let workingDir = buildDir;
       if (deployment.project.rootDirectory && deployment.project.rootDirectory !== './') {
         workingDir = path.join(buildDir, deployment.project.rootDirectory.replace(/^\.\//, ''));
       }
 
-      // --- CACHE RESTORATION ---
-      const cacheDir = path.join(process.cwd(), 'cache', Buffer.from(deployment.project.repoUrl).toString('base64').substring(0, 16));
-      const targetModules = path.join(workingDir, 'node_modules');
-      
-      if (!fs.existsSync(path.join(process.cwd(), 'cache'))) {
-        fs.mkdirSync(path.join(process.cwd(), 'cache'), { recursive: true });
-      }
-
-      if (fs.existsSync(cacheDir)) {
-        await this.log(deploymentId, `♻️ Restoring build cache for faster deployment...`, LogLevel.INFO);
-        if (!fs.existsSync(targetModules)) fs.mkdirSync(targetModules, { recursive: true });
-        // Using shell command to copy quickly
-        await this.executeLiveCommand(deploymentId, 'cp', ['-rn', `${cacheDir}/.`, targetModules], workingDir, {}, 60000).catch(() => {});
-      }
-
       // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `[2/4] 📦 Installing dependencies (optimized)...`, LogLevel.INFO);
+      await this.log(deploymentId, `[2/4] 📦 Updating dependencies (incremental)...`, LogLevel.INFO);
       
-      // Reverting to 'install' for stability, but keeping --prefer-offline for speed
       await this.executeLiveCommand(
         deploymentId, 
         'npm', 
-        ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'info'], 
+        ['install', '--prefer-offline', '--no-audit', '--no-fund'], 
         workingDir, 
         { NODE_ENV: 'development' }, 
         1200000
       ); // 20 min timeout
-
-      // --- SAVE CACHE ---
-      await this.log(deploymentId, `💾 Saving build cache for future use...`, LogLevel.INFO);
-      if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-      await this.executeLiveCommand(deploymentId, 'cp', ['-r', `${targetModules}/.`, cacheDir], workingDir, {}, 120000).catch(() => {});
       
       await this.log(deploymentId, `[3/4] 🔨 Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
