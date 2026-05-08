@@ -28,7 +28,14 @@ export class BuildService {
       },
     });
 
-    this.enqueueBuild(deployment.id);
+    try {
+      await this.enqueueBuild(deployment.id);
+    } catch (err) {
+      logger.warn(`Failed to enqueue build for ${deployment.id}, starting directly as fallback.`);
+      // Start build in background without awaiting to return response to user
+      this.runBuild(deployment.id).catch(e => logger.error(`Direct build fallback failed:`, e));
+    }
+    
     return deployment;
   }
 

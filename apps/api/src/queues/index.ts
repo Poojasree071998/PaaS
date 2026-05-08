@@ -5,7 +5,13 @@ import logger from '../config/logger';
 
 const connection = new IORedis(config.REDIS_URL, {
   maxRetriesPerRequest: null,
-  retryStrategy: (times) => Math.min(times * 50, 2000),
+  connectTimeout: 10000,
+  retryStrategy: (times) => Math.min(times * 100, 3000),
+  reconnectOnError: (err) => {
+    const targetError = 'READONLY';
+    if (err.message.includes(targetError)) return true;
+    return false;
+  }
 });
 
 connection.on('error', (err) => {
