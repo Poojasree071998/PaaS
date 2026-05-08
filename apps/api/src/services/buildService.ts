@@ -185,7 +185,7 @@ export class BuildService {
       
       // --- MAGIC CODE PATCHER (Zero-Config DB) ---
       try {
-        await this.patchHardcodedLinks(workingDir, deploymentId);
+        await this.patchHardcodedLinks(workingDir, deploymentId, env);
       } catch (e: any) {
         await this.log(deploymentId, `⚠️ Code patching skipped: ${e.message}`, LogLevel.WARN);
       }
@@ -330,25 +330,33 @@ export class BuildService {
     }
   }
 
-  private static async patchHardcodedLinks(dir: string, deploymentId: string) {
+  private static async patchHardcodedLinks(dir: string, deploymentId: string, env: any) {
     const files = await fsPromises.readdir(dir, { recursive: true });
     let patchedCount = 0;
 
+    const mongoUrl = env.MONGODB_URI || '';
+    const pgUrl = env.DATABASE_URL || '';
+
     for (const file of files) {
       const fullPath = path.join(dir, file as string);
-      const stat = await fsPromises.stat(fullPath);
+      const stat = await fsPromises.stat(fullPath).catch(() => null);
+      if (!stat) continue;
       
       if (stat.isFile() && (fullPath.endsWith('.js') || fullPath.endsWith('.ts') || fullPath.endsWith('.env') || fullPath.endsWith('.json'))) {
         let content = await fsPromises.readFile(fullPath, 'utf8');
         const originalContent = content;
 
-        // Replace MongoDB localhost links
-        content = content.replace(/mongodb:\/\/localhost:27017/g, 'process.env.MONGODB_URI');
-        content = content.replace(/mongodb:\/\/127\.0\.0\.1:27017/g, 'process.env.MONGODB_URI');
+        // Replace MongoDB localhost links with real values if available
+        if (mongoUrl) {
+          content = content.replace(/mongodb:\/\/localhost:27017[^\s'"`]*/g, mongoUrl);
+          content = content.replace(/mongodb:\/\/127\.0\.0\.1:27017[^\s'"`]*/g, mongoUrl);
+        }
         
-        // Replace Postgres localhost links
-        content = content.replace(/postgresql:\/\/localhost:5432/g, 'process.env.DATABASE_URL');
-        content = content.replace(/postgresql:\/\/127\.0\.0\.1:5432/g, 'process.env.DATABASE_URL');
+        // Replace Postgres localhost links with real values if available
+        if (pgUrl) {
+          content = content.replace(/postgresql:\/\/localhost:5432[^\s'"`]*/g, pgUrl);
+          content = content.replace(/postgresql:\/\/127\.0\.0\.1:5432[^\s'"`]*/g, pgUrl);
+        }
 
         if (content !== originalContent) {
           await fsPromises.writeFile(fullPath, content);
@@ -358,7 +366,7 @@ export class BuildService {
     }
 
     if (patchedCount > 0) {
-      await this.log(deploymentId, `🪄 Magic Patch: Automatically updated ${patchedCount} file(s) to use cloud database variables.`, LogLevel.INFO);
+      await this.log(deploymentId, `🪄 Magic Patch: Automatically updated ${patchedCount} file(s) with your real Cloud Database links.`, LogLevel.INFO);
     }
   }
 
