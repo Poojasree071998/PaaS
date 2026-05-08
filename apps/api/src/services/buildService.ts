@@ -102,7 +102,7 @@ export class BuildService {
       if (fs.existsSync(cacheDir)) {
         await this.log(deploymentId, `♻️ Restoring build cache for faster deployment...`, LogLevel.INFO);
         // Using shell command to copy quickly
-        await this.executeLiveCommand(deploymentId, 'cp', ['-r', `${cacheDir}/.`, targetModules], workingDir, 60000).catch(() => {});
+        await this.executeLiveCommand(deploymentId, 'cp', ['-r', `${cacheDir}/.`, targetModules], workingDir, {}, 60000).catch(() => {});
       }
 
       // --- REAL-TIME STREAMING ENGINE ---
@@ -112,7 +112,7 @@ export class BuildService {
       // --- SAVE CACHE ---
       await this.log(deploymentId, `💾 Saving build cache for future use...`, LogLevel.INFO);
       if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-      await this.executeLiveCommand(deploymentId, 'cp', ['-r', `${targetModules}/.`, cacheDir], workingDir, 120000).catch(() => {});
+      await this.executeLiveCommand(deploymentId, 'cp', ['-r', `${targetModules}/.`, cacheDir], workingDir, {}, 120000).catch(() => {});
       
       await this.log(deploymentId, `[3/4] 🔨 Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
