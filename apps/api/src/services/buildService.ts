@@ -8,6 +8,7 @@ import logger from '../config/logger';
 import { DeploymentStatus, LogLevel } from '@prisma/client';
 import { getIO } from '../config/socket';
 import { Framework } from '@prisma/client';
+import { buildQueue } from '../queues';
 
 const runningProcesses = new Map<string, any>(); // deploymentId -> { process, port }
 
@@ -26,8 +27,18 @@ export class BuildService {
       },
     });
 
-    this.runBuild(deployment.id).catch(err => logger.error('Build process failed:', err));
+    this.enqueueBuild(deployment.id);
     return deployment;
+  }
+
+  static async enqueueBuild(deploymentId: string) {
+    await buildQueue.add(`build-${deploymentId}`, { deploymentId }, {
+      removeOnComplete: true,
+      removeOnFail: false,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 }
+    });
+    logger.info(`Build job enqueued for deployment ${deploymentId}`);
   }
 
   static async runBuild(deploymentId: string) {
@@ -52,10 +63,8 @@ export class BuildService {
         await fsPromises.rm(buildDir, { recursive: true, force: true }).catch(() => {});
       }
       
-      await fsPromises.mkdir(buildDir, { recursive: true });
+      await this.log(deploymentId, `[1/4] 📥 Cloning repository...`, LogLevel.INFO);
       const git = simpleGit({ baseDir: buildDir, binary: 'git' });
-
-      await this.log(deploymentId, `📥 [1/3] Cloning repository...`, LogLevel.INFO);
       await git.clone(deployment.project.repoUrl, '.', ['--depth', '1']);
       await this.log(deploymentId, `✅ Repository cloned.`, LogLevel.INFO);
 
@@ -79,7 +88,7 @@ export class BuildService {
       }
 
       // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `📦 [2/3] Installing Dependencies...`, LogLevel.INFO);
+      await this.log(deploymentId, `[2/4] 📦 Installing dependencies...`, LogLevel.INFO);
       await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, { NODE_ENV: 'development' }, 1200000); // 20 min timeout
 
       // --- SAVE CACHE ---
@@ -87,7 +96,7 @@ export class BuildService {
       if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
       await this.executeLiveCommand(deploymentId, 'cp', ['-r', `${targetModules}/.`, cacheDir], workingDir, 120000).catch(() => {});
       
-      await this.log(deploymentId, `🔨 [3/3] Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
+      await this.log(deploymentId, `[3/4] 🔨 Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
@@ -109,6 +118,7 @@ export class BuildService {
           url: projectUrl,
         },
       });
+      await this.log(deploymentId, `[4/4] 🚀 Deploying to live servers...`, LogLevel.INFO);
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.READY);
 
       // --- BACKEND EXECUTION ENGINE ---
