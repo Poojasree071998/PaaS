@@ -67,6 +67,10 @@ export class AnalysisService {
       // 3. Scan for required ENV vars
       await this.scanForEnvVars(tempDir, result.requiredEnvVars);
 
+      // Filter out System-Managed variables (we will auto-inject these)
+      const systemManaged = ['BACKEND_URL', 'API_URL', 'NEXT_PUBLIC_API_URL', 'VITE_API_BASE'];
+      result.requiredEnvVars = result.requiredEnvVars.filter(v => !systemManaged.includes(v));
+
       // 4. Also check .env.example if it exists
       const envExamplePath = path.join(tempDir, '.env.example');
       if (fs.existsSync(envExamplePath)) {
