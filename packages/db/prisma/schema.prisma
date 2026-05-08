@@ -95,6 +95,7 @@ enum DatabaseType {
   POSTGRES
   REDIS
   MYSQL
+  MONGODB
 }
 
 enum DatabaseStatus {

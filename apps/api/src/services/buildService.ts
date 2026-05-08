@@ -57,7 +57,14 @@ export class BuildService {
 
     const deployment = await prisma.deployment.findUnique({
       where: { id: deploymentId },
-      include: { project: true },
+      include: { 
+        project: {
+          include: {
+            envVars: true,
+            databases: true
+          }
+        } 
+      },
     });
 
     if (!deployment) return;
