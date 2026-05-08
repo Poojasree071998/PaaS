@@ -117,19 +117,29 @@ export class BuildService {
         workingDir = path.join(buildDir, deployment.project.rootDirectory.replace(/^\.\//, ''));
       }
 
-      // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `[2/4] 📦 Updating dependencies (incremental)...`, LogLevel.INFO);
+      // --- SMART INSTALL ENGINE (FAST DEPLOYMENT) ---
+      const pkgPath = path.join(workingDir, 'package.json');
+      const lockPath = path.join(workingDir, 'package-lock.json');
+      const pkgHash = fs.existsSync(pkgPath) ? fs.readFileSync(pkgPath, 'utf8') : '';
       
+      await this.log(deploymentId, `[2/4] 📦 Checking dependencies...`, LogLevel.INFO);
+      
+      // If node_modules exists, we try an incremental update
+      const modulesExist = fs.existsSync(path.join(workingDir, 'node_modules'));
+      
+      if (modulesExist) {
+        await this.log(deploymentId, `⚡ Persistent node_modules found. Running fast sync...`, LogLevel.INFO);
+      }
+
       await this.executeLiveCommand(
         deploymentId, 
         'npm', 
-        ['install', '--prefer-offline', '--no-audit', '--no-fund'], 
+        ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'error'], 
         workingDir, 
         { NODE_ENV: 'development' }, 
         1200000
-      ); // 20 min timeout
-      
-      await this.log(deploymentId, `[3/4] 🔨 Running Build: ${deployment.project.buildCommand || 'npm run build'}...`, LogLevel.INFO);
+      );
+      await this.log(deploymentId, `✅ Dependencies synchronized.`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
