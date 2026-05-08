@@ -77,6 +77,12 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       path.join(projectPath, 'build'),
       path.join(projectPath, 'public'),
       path.join(projectPath, 'out'),
+      path.join(projectPath, 'client', 'dist'),
+      path.join(projectPath, 'client', 'build'),
+      path.join(projectPath, 'frontend', 'dist'),
+      path.join(projectPath, 'frontend', 'build'),
+      path.join(projectPath, 'web', 'dist'),
+      path.join(projectPath, 'apps', 'web', 'dist'),
     ];
 
     for (const folder of searchFolders) {
@@ -97,7 +103,21 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
     // 4. Fallback to index.html in any valid folder
     for (const folder of searchFolders) {
       const index = path.join(folder, 'index.html');
-      if (fs.existsSync(index)) return res.sendFile(index);
+      if (fs.existsSync(index)) {
+        // INJECT <base> tag to fix subpath routing issues
+        let html = fs.readFileSync(index, 'utf8');
+        const baseTag = `<base href="/live/${id}/">`;
+        
+        if (html.includes('<head>')) {
+          html = html.replace('<head>', `<head>\n    ${baseTag}`);
+        } else if (html.includes('<html>')) {
+          html = html.replace('<html>', `<html>\n<head>${baseTag}</head>`);
+        } else {
+          html = baseTag + html;
+        }
+        
+        return res.send(html);
+      }
     }
 
     res.status(404).send(`
@@ -145,6 +165,44 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/databases', databaseRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+
+// --- SMART ASSET FALLBACK ---
+// If a request (like /assets/main.js) 404s, check if it came from a /live/:id page
+// and try to serve it from that deployment's folder.
+app.use(async (req, res, next) => {
+  const referer = req.get('Referer');
+  if (referer && referer.includes('/live/')) {
+    const match = referer.match(/\/live\/([^\/?#]+)/);
+    if (match) {
+      const id = match[1];
+      const subPath = req.path.startsWith('/') ? req.path.substring(1) : req.path;
+      
+      // We don't want to infinite loop or serve index.html here
+      if (!subPath || subPath === 'index.html') return next();
+
+      const buildRoot = path.join(process.cwd(), 'temp-builds', id);
+      if (fs.existsSync(buildRoot)) {
+        // Try all common search folders for this ID
+        const searchFolders = [
+          buildRoot,
+          path.join(buildRoot, 'dist'),
+          path.join(buildRoot, 'build'),
+          path.join(buildRoot, 'public'),
+          path.join(buildRoot, 'client', 'dist'),
+          path.join(buildRoot, 'frontend', 'dist'),
+        ];
+
+        for (const folder of searchFolders) {
+          const targetFile = path.join(folder, subPath);
+          if (fs.existsSync(targetFile) && !fs.lstatSync(targetFile).isDirectory()) {
+            return res.sendFile(targetFile);
+          }
+        }
+      }
+    }
+  }
+  next();
+});
 
 // 404 Handler
 app.use((req, res) => {
