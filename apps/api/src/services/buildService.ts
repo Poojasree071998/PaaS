@@ -78,7 +78,7 @@ export class BuildService {
     }
 
     buildingDeployments.add(deploymentId);
-    const buildDir = path.join(process.cwd(), 'temp-builds', deploymentId);
+    const buildDir = path.join(process.cwd(), 'temp-builds', deployment.projectId);
     
     try {
       await prisma.deployment.update({
