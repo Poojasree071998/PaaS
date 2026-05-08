@@ -97,7 +97,12 @@ export class BuildService {
         await this.log(deploymentId, `✅ Project updated via incremental pull.`, LogLevel.INFO);
       } else {
         await this.log(deploymentId, `📦 Cloning fresh repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
-        await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
+        try {
+          await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
+        } catch (err) {
+          await this.log(deploymentId, `⚠️ Branch '${deployment.branch}' not found. Attempting to clone default branch...`, LogLevel.WARN);
+          await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
+        }
         await this.log(deploymentId, `✅ Fresh repository cloned.`, LogLevel.INFO);
       }
 
