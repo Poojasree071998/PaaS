@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProjectService } from '../services/projectService';
+import { AnalysisService } from '../services/analysisService';
 
 export const createProject = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -88,8 +89,13 @@ export const searchRepos = async (req: Request, res: Response, next: NextFunctio
 
 export const detectFramework = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // mock
-    res.json({ success: true, data: { framework: 'NEXTJS' } });
+    const { repoUrl } = req.query;
+    if (!repoUrl || typeof repoUrl !== 'string') {
+      return res.status(400).json({ success: false, message: 'repoUrl query parameter is required' });
+    }
+
+    const analysis = await AnalysisService.analyzeRepository(repoUrl);
+    res.json({ success: true, data: analysis });
   } catch (error) {
     next(error);
   }
