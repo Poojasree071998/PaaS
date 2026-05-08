@@ -17,6 +17,8 @@ const io = new Server(server, {
 });
 
 import projectRoutes from './routes/projectRoutes';
+import deploymentRoutes from './routes/deploymentRoutes';
+import databaseRoutes from './routes/databaseRoutes';
 import './queues/buildQueue'; // Initialize worker
 
 const prisma = new PrismaClient();
@@ -27,6 +29,8 @@ app.use(express.json());
 
 // Routes
 app.use('/api/projects', projectRoutes);
+app.use('/api/deployments', deploymentRoutes);
+app.use('/api/databases', databaseRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {
