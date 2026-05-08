@@ -124,6 +124,10 @@ export class BuildService {
         where: { projectId: deployment.projectId }
       });
 
+      if (projectDatabases.length === 0) {
+        await this.log(deploymentId, `⚠️ No databases linked to this project. Please link a database in the 'Databases' tab to enable automatic cloud connection.`, LogLevel.WARN);
+      }
+
       const env: Record<string, string> = {
         NODE_ENV: 'development', // Must be development during build to install devDependencies (Vite, etc)
         PORT: '3000',
@@ -348,14 +352,14 @@ export class BuildService {
 
         // Replace MongoDB localhost links with real values if available
         if (mongoUrl) {
-          content = content.replace(/mongodb:\/\/localhost:27017[^\s'"`]*/g, mongoUrl);
-          content = content.replace(/mongodb:\/\/127\.0\.0\.1:27017[^\s'"`]*/g, mongoUrl);
+          content = content.replace(/(mongodb:\/\/)?localhost:27017[^\s'"`]*/g, mongoUrl);
+          content = content.replace(/(mongodb:\/\/)?127\.0\.0\.1:27017[^\s'"`]*/g, mongoUrl);
         }
         
         // Replace Postgres localhost links with real values if available
         if (pgUrl) {
-          content = content.replace(/postgresql:\/\/localhost:5432[^\s'"`]*/g, pgUrl);
-          content = content.replace(/postgresql:\/\/127\.0\.0\.1:5432[^\s'"`]*/g, pgUrl);
+          content = content.replace(/(postgresql:\/\/)?localhost:5432[^\s'"`]*/g, pgUrl);
+          content = content.replace(/(postgresql:\/\/)?127\.0\.0\.1:5432[^\s'"`]*/g, pgUrl);
         }
 
         if (content !== originalContent) {
