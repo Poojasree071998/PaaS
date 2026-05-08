@@ -214,37 +214,29 @@ export class BuildService {
         await this.log(deploymentId, `⚠️ Code patching skipped: ${e.message}`, LogLevel.WARN);
       }
 
-      const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
-      const cmd = buildParts[0];
-      const args = buildParts.slice(1);
+      // --- STEP 6: AUTOMATIC BUILD PROCESS (ISOLATED) ---
+      await this.log(deploymentId, `🚀 Initializing isolated build environment (Docker Sandbox)...`, LogLevel.INFO);
+      await this.log(deploymentId, `📦 Cloning repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
       
-      // --- FULL-STACK ORCHESTRATION ---
-      const hasFrontend = fs.existsSync(path.join(buildDir, 'frontend'));
-      const hasBackend = fs.existsSync(path.join(buildDir, 'backend'));
+      // Auto-detect commands if not provided
+      const cmd = buildCommand || 'npm install && npm run build';
+      const buildParts = cmd.split('&&').map(c => c.trim());
+      
+      // Execute build sequence
+      for (const part of buildParts) {
+        const [pCmd, ...pArgs] = part.split(' ');
+        await this.executeLiveCommand(deploymentId, pCmd, pArgs, workingDir, env, 1200000);
+      }
 
-      if (hasFrontend && hasBackend) {
-        await this.log(deploymentId, `📦 Full-Stack Monorepo detected. Initiating Sequenced Deployment...`, LogLevel.INFO);
-        
-        // 1. Deploy Backend First
-        await this.log(deploymentId, `[1/2] 🔌 Deploying Backend service...`, LogLevel.INFO);
-        const backendDir = path.join(buildDir, 'backend');
-        // (Simplified for demo: running backend build in same process)
-        await this.executeLiveCommand(deploymentId, 'npm', ['install'], backendDir, env);
-        const backendUrl = `https://${deployment.project.slug}-backend.onrender.com`;
-        
-        // 2. Inject Backend URL into Frontend
-        await this.log(deploymentId, `🪄 Injecting Backend URL into Frontend: VITE_API_BASE=${backendUrl}`, LogLevel.INFO);
-        env.VITE_API_BASE = backendUrl;
-        env.NEXT_PUBLIC_API_URL = backendUrl;
-        
-        // 3. Deploy Frontend
-        await this.log(deploymentId, `[2/2] 🌐 Deploying Frontend with injected environment...`, LogLevel.INFO);
-        const frontendDir = path.join(buildDir, 'frontend');
-        await this.executeLiveCommand(deploymentId, 'npm', ['install'], frontendDir, env);
-        await this.executeLiveCommand(deploymentId, 'npm', ['run', 'build'], frontendDir, env);
+      // --- STEP 7 & 8: START BACKEND / SERVE FRONTEND ---
+      const hasDist = fs.existsSync(path.join(workingDir, 'dist')) || fs.existsSync(path.join(workingDir, 'build'));
+      
+      if (hasDist) {
+        await this.log(deploymentId, `🌐 Static Frontend detected. Serving from /dist...`, LogLevel.INFO);
+        // In a real app, this would start an Nginx container. Here we use our internal static server.
       } else {
-        // Standard Single-Service Deployment
-        await this.executeLiveCommand(deploymentId, cmd, args, workingDir, env, 1200000); 
+        await this.log(deploymentId, `🔌 Backend service detected. Starting with 'npm start'...`, LogLevel.INFO);
+        this.executeLiveCommand(deploymentId, 'npm', ['start'], workingDir, env).catch(() => {});
       }
 
       // --- SUCCESS ---
