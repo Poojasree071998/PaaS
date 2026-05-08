@@ -12,7 +12,7 @@ import { buildQueue } from '../queues';
 
 const runningProcesses = new Map<string, any>(); // deploymentId -> { process, port }
 const buildingDeployments = new Set<string>(); // deploymentId
-
+const projectBuildDirs = new Map<string, string>(); // projectId -> path
 export class BuildService {
   static async triggerBuild(projectId: string, userId: string, branch: string = 'main') {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -254,13 +254,21 @@ export class BuildService {
 
       await this.log(deploymentId, `✨ SUCCESS! Live at: ${projectUrl}`, LogLevel.INFO);
     } catch (error: any) {
-      logger.error(`Build failed:`, error);
+      buildingDeployments.delete(deploymentId);
+      const errorMessage = error.message || 'Build failed';
+      
+      // Self-Healing: If it's a module error, clear the install hash to force fresh install next time
+      if (errorMessage.includes('Cannot find module') || errorMessage.includes('not found')) {
+        const hashFile = path.join(buildDir, '.last-install-hash');
+        if (fs.existsSync(hashFile)) fs.unlinkSync(hashFile);
+      }
+
       await prisma.deployment.update({
         where: { id: deploymentId },
-        data: { status: DeploymentStatus.ERROR, errorMessage: error.message },
+        data: { status: DeploymentStatus.ERROR, errorMessage },
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.ERROR);
-      await this.log(deploymentId, `❌ FAILED: ${error.message}`, LogLevel.ERROR);
+      await this.log(deploymentId, `❌ FAILED: ${errorMessage}`, LogLevel.ERROR);
     } finally {
       buildingDeployments.delete(deploymentId);
     }
