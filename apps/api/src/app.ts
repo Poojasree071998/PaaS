@@ -60,6 +60,23 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       return res.status(404).send('<h1>Deployment record not found</h1>');
     }
 
+    const buildRoot = path.join(process.cwd(), 'temp-builds', id);
+    
+    // --- SELF-HEALING ENGINE (EPHEMERAL FS RECOVERY) ---
+    if (!fs.existsSync(buildRoot)) {
+      logger.warn(`Deployment ${id} files missing. Triggering auto-recovery...`);
+      BuildService.runBuild(id).catch(err => logger.error('Recovery failed:', err));
+      
+      return res.status(503).send(`
+        <div style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto; text-align: center;">
+          <h1 style="color: #3b82f6;">Restoring Deployment...</h1>
+          <p style="color: #71717a;">The server recently restarted and is currently restoring this project from Git. It will be live again in about 60 seconds.</p>
+          <div style="margin-top: 20px; font-size: 14px; color: #a1a1aa;">Please refresh this page shortly.</div>
+          <script>setTimeout(() => window.location.reload(), 15000);</script>
+        </div>
+      `);
+    }
+
     // --- REVERSE PROXY FOR BACKENDS ---
     const runningPort = (deployment.meta as any)?.port || BuildService.getRunningPort(id);
     if (runningPort) {
@@ -79,7 +96,15 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
 
       proxyReq.on('error', (err) => {
         logger.error('Proxy error:', err);
-        res.status(502).send('<h1>Bad Gateway</h1><p>The backend process is not responding.</p>');
+        // If proxy fails, the process might be dead. Try to restart.
+        BuildService.runBuild(id).catch(() => {});
+        res.status(502).send(`
+          <div style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto; text-align: center;">
+            <h1 style="color: #ef4444;">Waking Up Backend...</h1>
+            <p style="color: #71717a;">The backend process for this project is currently starting up. This usually takes 30-60 seconds.</p>
+            <script>setTimeout(() => window.location.reload(), 10000);</script>
+          </div>
+        `);
       });
 
       req.pipe(proxyReq);

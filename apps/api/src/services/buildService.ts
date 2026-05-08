@@ -47,6 +47,11 @@ export class BuildService {
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.BUILDING);
 
+      // Clean up existing directory if any (ensures fresh recovery)
+      if (fs.existsSync(buildDir)) {
+        await fsPromises.rm(buildDir, { recursive: true, force: true }).catch(() => {});
+      }
+      
       await fsPromises.mkdir(buildDir, { recursive: true });
       const git = simpleGit({ baseDir: buildDir, binary: 'git' });
 
@@ -109,6 +114,12 @@ export class BuildService {
       // --- BACKEND EXECUTION ENGINE ---
       const backendFrameworks: string[] = [Framework.EXPRESS, Framework.FASTAPI, Framework.DJANGO, Framework.RAILS, Framework.LARAVEL, Framework.NEXTJS];
       if (backendFrameworks.includes(deployment.project.framework as string)) {
+        // Kill existing process for this deployment if it exists
+        const existing = runningProcesses.get(deploymentId);
+        if (existing && existing.process) {
+          existing.process.kill();
+        }
+
         await this.log(deploymentId, `🚀 Starting Backend Process...`, LogLevel.INFO);
         
         // Assign a random free port (3001-9999)
