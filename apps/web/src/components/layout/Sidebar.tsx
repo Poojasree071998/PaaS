@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -12,6 +13,7 @@ import {
   CreditCard,
   Plus
 } from 'lucide-react';
+import { getApiUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -27,6 +29,24 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+
+  // --- AUTOMATIC WAKE-UP ENGINE ---
+  // Background ping to wake up the API from Render's free-tier sleep
+  useEffect(() => {
+    const wakeUp = async () => {
+      try {
+        const apiUrl = getApiUrl();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for Render cold starts and busy builds
+        await fetch(`${apiUrl}/health`, { signal: controller.signal }).catch(() => {});
+        clearTimeout(timeoutId);
+      } catch (e) {}
+    };
+    wakeUp();
+    // Ping every 10 minutes to keep it alive while the user is active
+    const interval = setInterval(wakeUp, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="w-64 border-r border-white/10 bg-black/50 backdrop-blur-xl h-screen flex flex-col fixed left-0 top-0">

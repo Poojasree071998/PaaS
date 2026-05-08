@@ -42,7 +42,7 @@ export default function ImportProjectPage() {
       console.log('🚀 Triggering deployment at:', `${apiUrl}/api/deployments`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for Render cold starts and busy builds
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for Render cold starts and busy builds
 
       const response = await fetch(`${apiUrl}/api/deployments`, {
         method: 'POST',
