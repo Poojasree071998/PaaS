@@ -71,8 +71,8 @@ export class BuildService {
       }
 
       // --- REAL-TIME STREAMING ENGINE ---
-      await this.log(deploymentId, `📦 [2/3] Installing Production Dependencies...`, LogLevel.INFO);
-      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, 1200000); // 20 min timeout
+      await this.log(deploymentId, `📦 [2/3] Installing Dependencies...`, LogLevel.INFO);
+      await this.executeLiveCommand(deploymentId, 'npm', ['install', '--no-audit', '--no-fund', '--loglevel', 'info'], workingDir, { NODE_ENV: 'development' }, 1200000); // 20 min timeout
 
       // --- SAVE CACHE ---
       await this.log(deploymentId, `💾 Saving build cache for future use...`, LogLevel.INFO);
@@ -84,7 +84,7 @@ export class BuildService {
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
       
-      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, 1200000); // 20 min timeout
+      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, { NODE_ENV: 'development' }, 1200000); // 20 min timeout
 
       // --- SUCCESS ---
       let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
@@ -116,9 +116,13 @@ export class BuildService {
   }
 
   // Uses 'spawn' instead of 'exec' for REAL-TIME line-by-line logging
-  private static async executeLiveCommand(deploymentId: string, command: string, args: string[], cwd: string, timeoutMs: number = 300000) {
+  private static async executeLiveCommand(deploymentId: string, command: string, args: string[], cwd: string, env: any = {}, timeoutMs: number = 300000) {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, args, { cwd, shell: true });
+      const child = spawn(command, args, { 
+        cwd, 
+        shell: true,
+        env: { ...process.env, ...env }
+      });
       
       const timeout = setTimeout(() => {
         child.kill();
