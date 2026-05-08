@@ -100,7 +100,13 @@ export class BuildService {
         try {
           await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
         } catch (err) {
-          await this.log(deploymentId, `⚠️ Branch '${deployment.branch}' not found. Attempting to clone default branch...`, LogLevel.WARN);
+          await this.log(deploymentId, `⚠️ Branch '${deployment.branch}' not found. Cleaning up for fallback...`, LogLevel.WARN);
+          // Wipe the directory contents to ensure fallback clone works on an empty path
+          const files = await fsPromises.readdir(buildDir);
+          for (const file of files) {
+            await fsPromises.rm(path.join(buildDir, file), { recursive: true, force: true }).catch(() => {});
+          }
+          await this.log(deploymentId, `🔄 Attempting to clone default branch...`, LogLevel.INFO);
           await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
         }
         await this.log(deploymentId, `✅ Fresh repository cloned.`, LogLevel.INFO);
