@@ -182,6 +182,14 @@ export class BuildService {
       }
 
       await this.log(deploymentId, `[3/4] 🔨 Building project...`, LogLevel.INFO);
+      
+      // --- MAGIC CODE PATCHER (Zero-Config DB) ---
+      try {
+        await this.patchHardcodedLinks(workingDir, deploymentId);
+      } catch (e) {
+        await this.log(deploymentId, `⚠️ Code patching skipped: ${e.message}`, LogLevel.WARN);
+      }
+
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
@@ -319,6 +327,38 @@ export class BuildService {
       }
     } catch (e) {
       logger.error('Failed to cleanup stuck builds:', e);
+    }
+  }
+
+  private static async patchHardcodedLinks(dir: string, deploymentId: string) {
+    const files = await fsPromises.readdir(dir, { recursive: true });
+    let patchedCount = 0;
+
+    for (const file of files) {
+      const fullPath = path.join(dir, file as string);
+      const stat = await fsPromises.stat(fullPath);
+      
+      if (stat.isFile() && (fullPath.endsWith('.js') || fullPath.endsWith('.ts') || fullPath.endsWith('.env') || fullPath.endsWith('.json'))) {
+        let content = await fsPromises.readFile(fullPath, 'utf8');
+        const originalContent = content;
+
+        // Replace MongoDB localhost links
+        content = content.replace(/mongodb:\/\/localhost:27017/g, 'process.env.MONGODB_URI');
+        content = content.replace(/mongodb:\/\/127\.0\.0\.1:27017/g, 'process.env.MONGODB_URI');
+        
+        // Replace Postgres localhost links
+        content = content.replace(/postgresql:\/\/localhost:5432/g, 'process.env.DATABASE_URL');
+        content = content.replace(/postgresql:\/\/127\.0\.0\.1:5432/g, 'process.env.DATABASE_URL');
+
+        if (content !== originalContent) {
+          await fsPromises.writeFile(fullPath, content);
+          patchedCount++;
+        }
+      }
+    }
+
+    if (patchedCount > 0) {
+      await this.log(deploymentId, `🪄 Magic Patch: Automatically updated ${patchedCount} file(s) to use cloud database variables.`, LogLevel.INFO);
     }
   }
 
