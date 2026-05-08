@@ -173,7 +173,6 @@ export class BuildService {
       env.PATH = `${localBin}${path.delimiter}${process.env.PATH}`;
 
       // --- LIGHTNING-FAST INSTALL ENGINE ---
-      const pkgPath = path.join(workingDir, 'package.json');
       const hashFile = path.join(workingDir, '.last-install-hash');
       const modulesPath = path.join(workingDir, 'node_modules');
       
