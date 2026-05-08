@@ -83,6 +83,12 @@ export class BuildService {
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.BUILDING);
 
       await this.log(deploymentId, `[1/4] 📥 Fetching updates...`, LogLevel.INFO);
+      
+      // Ensure the build directory exists BEFORE initializing git
+      if (!fs.existsSync(buildDir)) {
+        await fsPromises.mkdir(buildDir, { recursive: true });
+      }
+
       const git = simpleGit({ baseDir: buildDir, binary: 'git' });
       
       if (fs.existsSync(path.join(buildDir, '.git'))) {
@@ -91,7 +97,6 @@ export class BuildService {
         await git.reset(['--hard', `origin/${deployment.branch}`]);
         await this.log(deploymentId, `✅ Project updated via incremental pull.`, LogLevel.INFO);
       } else {
-        await fsPromises.mkdir(buildDir, { recursive: true });
         await git.clone(deployment.project.repoUrl, '.', ['--depth', '1', '-b', deployment.branch]);
         await this.log(deploymentId, `✅ Fresh repository cloned.`, LogLevel.INFO);
       }
