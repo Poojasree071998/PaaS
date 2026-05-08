@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import { 
   ChevronLeft, 
@@ -12,7 +12,10 @@ import {
   AlertCircle,
   Loader2,
   Settings,
-  Folder
+  Folder,
+  Zap,
+  Clock,
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { getApiUrl, getSocketUrl } from '@/lib/api';
@@ -33,11 +36,30 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
   const [deployment, setDeployment] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Real-time Progress Tracking
+  const currentStep = useMemo(() => {
+    if (status === 'READY') return 4;
+    if (status === 'ERROR') return 0;
+    
+    const lastStepLog = [...logs].reverse().find(l => l.content.match(/\[(\d)\/4\]/));
+    if (lastStepLog) {
+      const match = lastStepLog.content.match(/\[(\d)\/4\]/);
+      return match ? parseInt(match[1]) : 1;
+    }
+    return 1;
+  }, [logs, status]);
+
+  const steps = [
+    { id: 1, name: 'Clone', icon: Folder },
+    { id: 2, name: 'Install', icon: Zap },
+    { id: 3, name: 'Build', icon: Settings },
+    { id: 4, name: 'Deploy', icon: ExternalLink },
+  ];
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const apiUrl = getApiUrl();
-
         const [depRes, logsRes] = await Promise.all([
           fetch(`${apiUrl}/api/deployments/${id}`),
           fetch(`${apiUrl}/api/deployments/${id}/logs`)
@@ -97,157 +119,245 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="h-screen flex items-center justify-center bg-black">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 text-white animate-spin" />
-          <p className="text-zinc-500 font-medium animate-pulse">Initializing build logs...</p>
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-white/5 border-t-white rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-white animate-pulse" />
+            </div>
+          </div>
+          <p className="text-zinc-500 font-bold uppercase tracking-[0.2em] text-[10px]">Initializing Pipeline</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard" className="p-2 hover:bg-white/5 rounded-full transition-colors">
-          <ChevronLeft className="w-5 h-5" />
-        </Link>
-        <div>
-          <div className="flex items-center gap-2 text-sm text-zinc-500 mb-1">
-            <span>Project: {deployment?.project?.name || 'Loading...'}</span>
-            <span>/</span>
-            <span className="flex items-center gap-1"><Hash className="w-3 h-3" /> {id.substring(0, 8)}</span>
+    <div className="space-y-8 animate-in fade-in duration-700">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard" className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5">
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">
+              <span className="hover:text-white transition-colors cursor-default">{deployment?.project?.name}</span>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-zinc-600 font-mono flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded italic">
+                <Hash className="w-3 h-3" /> {id.substring(0, 8)}
+              </span>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tighter">Deployment Pipeline</h1>
           </div>
-          <h1 className="text-2xl font-bold">Deployment Pipeline</h1>
         </div>
-        <div className="ml-auto flex gap-3">
-          {status === 'READY' && (
-            <a 
-              href={deployment?.url?.startsWith('/') ? `${window.location.origin}${deployment.url}` : (deployment?.url || '#')} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-semibold text-sm hover:bg-zinc-200 transition-all active:scale-95 shadow-lg shadow-white/10"
-            >
-              Visit Site <ExternalLink className="w-4 h-4" />
-            </a>
-          )}
+
+        {status === 'READY' && (
+          <a 
+            href={deployment?.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="group flex items-center gap-3 bg-white text-black px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
+          >
+            Open Live Site <ExternalLink className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+          </a>
+        )}
+      </div>
+
+      {/* Real-time Step Progress Tracker */}
+      <div className="glass-card p-2 bg-white/[0.02] border-white/5">
+        <div className="grid grid-cols-4 gap-2">
+          {steps.map((step) => {
+            const isActive = currentStep === step.id;
+            const isCompleted = currentStep > step.id;
+            return (
+              <div key={step.id} className={cn(
+                "relative p-4 rounded-xl border transition-all duration-500 flex flex-col items-center justify-center gap-2 overflow-hidden",
+                isActive ? "bg-white/10 border-white/20 scale-105 z-10 shadow-xl" : 
+                isCompleted ? "bg-emerald-500/5 border-emerald-500/20 opacity-60" : "bg-transparent border-white/5 opacity-30"
+              )}>
+                {isActive && (
+                  <div className="absolute bottom-0 left-0 h-1 bg-blue-500 animate-[shimmer_2s_infinite]" style={{ width: '100%' }} />
+                )}
+                <step.icon className={cn(
+                  "w-5 h-5",
+                  isActive ? "text-blue-400 animate-bounce" : isCompleted ? "text-emerald-500" : "text-zinc-500"
+                )} />
+                <span className={cn(
+                  "text-[10px] font-black uppercase tracking-widest",
+                  isActive ? "text-white" : "text-zinc-500"
+                )}>
+                  {step.name}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 space-y-6">
-          {/* Status Header */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="lg:col-span-3 space-y-8">
+          {/* Main Status Display */}
           <div className={cn(
-            "glass-card p-6 flex items-center justify-between border-white/5 transition-all duration-500",
-            status === 'READY' && "bg-emerald-500/5 border-emerald-500/20"
+            "glass-card p-8 border-l-8 transition-all duration-700",
+            status === 'READY' ? "border-emerald-500 bg-emerald-500/5" : 
+            status === 'ERROR' ? "border-red-500 bg-red-500/5" : "border-amber-500 bg-amber-500/5"
           )}>
-            <div className="flex items-center gap-4">
-              {(status === 'BUILDING' || status === 'QUEUED') && <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />}
-              {status === 'READY' && <CheckCircle2 className="w-8 h-8 text-emerald-500" />}
-              {status === 'ERROR' && <AlertCircle className="w-8 h-8 text-red-500" />}
-              <div>
-                <h3 className="font-semibold text-lg tracking-tight">{status}</h3>
-                <p className="text-sm text-zinc-500">
-                  {status === 'READY' ? 'Deployment is live and accessible!' : 'Your project is being prepared...'}
-                </p>
-                {status === 'READY' && deployment?.url && (
-                  <div className="mt-3 flex items-center gap-3">
-                    <a 
-                      href={deployment.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs font-mono text-emerald-400 hover:underline flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded"
-                    >
-                      {deployment.url} <ExternalLink className="w-3 h-3" />
-                    </a>
+            <div className="flex items-start justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
+                    status === 'READY' ? "bg-emerald-500" : status === 'ERROR' ? "bg-red-500" : "bg-amber-500"
+                  )}>
+                    {status === 'READY' ? <CheckCircle2 className="w-7 h-7 text-white" /> : 
+                     status === 'ERROR' ? <AlertCircle className="w-7 h-7 text-white" /> : 
+                     <Loader2 className="w-7 h-7 text-white animate-spin" />}
                   </div>
-                )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-2xl font-bold">{status}</h2>
+                      <span className="text-[10px] font-black bg-white/10 px-2 py-0.5 rounded-full text-zinc-400 uppercase tracking-tighter">Production</span>
+                    </div>
+                    <p className="text-zinc-400 font-medium">
+                      {status === 'READY' ? 'Your latest changes are now live globally.' : 
+                       status === 'ERROR' ? 'The build process encountered an error.' : 
+                       `Executing Step ${currentStep} of 4...`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden md:flex items-center gap-8 text-right">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Region</p>
+                  <p className="font-bold text-white">Global (Anycast)</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Engine</p>
+                  <p className="font-bold text-white flex items-center gap-2 justify-end">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" /> Turbo-Build
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-zinc-500">Infrastructure</p>
-              <p className="text-lg font-mono text-white">Render PaaS</p>
-            </div>
           </div>
 
-          {/* Build Info Section */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="glass-card p-4 border-white/5">
-              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-2 flex items-center gap-2">
-                <Settings className="w-3 h-3" /> Build Command
-              </p>
-              <p className="font-mono text-xs bg-black/40 p-2 rounded border border-white/5 text-zinc-300">
-                {deployment?.project?.buildCommand || 'npm run build'}
-              </p>
-            </div>
-            <div className="glass-card p-4 border-white/5">
-              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-2 flex items-center gap-2">
-                <Folder className="w-3 h-3" /> Root Directory
-              </p>
-              <p className="font-mono text-xs bg-black/40 p-2 rounded border border-white/5 text-zinc-300">
-                {deployment?.project?.rootDirectory || './'}
-              </p>
-            </div>
-          </div>
-
-          {/* Logs Terminal */}
-          <div className="bg-black/50 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden flex flex-col h-[500px] shadow-2xl">
-            <div className="bg-white/5 px-4 py-3 flex items-center gap-2 border-b border-white/5">
-              <Terminal className="w-4 h-4 text-zinc-500" />
-              <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Build Logs</span>
-            </div>
-            <div 
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto p-6 font-mono text-sm space-y-2 selection:bg-white/20 scrollbar-thin scrollbar-thumb-white/10"
-            >
-              {logs.length === 0 && (
-                <div className="flex items-center gap-2 text-zinc-600 italic">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Connecting to build stream...
+          {/* Terminal Logs */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-emerald-500/20 rounded-2xl blur opacity-30 group-hover:opacity-100 transition duration-1000"></div>
+            <div className="relative bg-[#09090b] rounded-2xl border border-white/10 overflow-hidden flex flex-col h-[600px] shadow-2xl">
+              <div className="bg-white/5 px-6 py-4 flex items-center justify-between border-b border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500/20" />
+                    <div className="w-3 h-3 rounded-full bg-amber-500/20" />
+                    <div className="w-3 h-3 rounded-full bg-emerald-500/20" />
+                  </div>
+                  <div className="h-4 w-px bg-white/10 mx-2" />
+                  <Terminal className="w-4 h-4 text-zinc-500" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">System Pipeline Logs</span>
                 </div>
-              )}
-              {logs.map((log) => (
-                <div key={log.id} className="flex gap-4 group hover:bg-white/5 rounded px-2 -mx-2 transition-colors py-0.5">
-                  <span className="text-zinc-700 select-none w-20 shrink-0 text-xs mt-0.5">
-                    {new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                  <span className={cn(
-                    "flex-1 break-all",
-                    log.level === 'error' ? 'text-red-400' : 
-                    log.level === 'warn' ? 'text-amber-400' : 'text-zinc-300'
-                  )}>
-                    {log.content}
-                  </span>
+                <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Live Streaming</span>
                 </div>
-              ))}
+              </div>
+              
+              <div 
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto p-8 font-mono text-[13px] leading-relaxed space-y-1.5 scrollbar-thin scrollbar-thumb-white/10"
+              >
+                {logs.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full gap-4 text-zinc-700 italic">
+                    <div className="w-8 h-8 border-2 border-white/5 border-t-white/20 rounded-full animate-spin" />
+                    <p>Connecting to secure build node...</p>
+                  </div>
+                )}
+                {logs.map((log) => {
+                  const isStep = log.content.includes('[') && log.content.includes('/4]');
+                  const isSuccess = log.content.includes('✅') || log.content.includes('SUCCESS');
+                  
+                  return (
+                    <div key={log.id} className={cn(
+                      "flex gap-6 group rounded px-4 -mx-4 transition-all py-1 border-l-2 border-transparent",
+                      isStep && "bg-white/5 border-l-blue-500 my-4 py-3 font-bold text-blue-50",
+                      isSuccess && "bg-emerald-500/5 border-l-emerald-500 text-emerald-50",
+                      log.level === 'error' && "bg-red-500/5 border-l-red-500 text-red-100"
+                    )}>
+                      <span className="text-zinc-800 select-none w-24 shrink-0 text-xs tabular-nums mt-0.5">
+                        {new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 1 })}
+                      </span>
+                      <span className={cn(
+                        "flex-1 break-all whitespace-pre-wrap",
+                        log.level === 'error' ? 'text-red-400' : 
+                        log.level === 'warn' ? 'text-amber-400' : 
+                        isStep ? 'text-white' : 
+                        isSuccess ? 'text-emerald-400' : 'text-zinc-400'
+                      )}>
+                        {log.content}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="glass-card p-6 space-y-6 border-white/5">
-            <h3 className="font-semibold text-sm uppercase tracking-widest text-zinc-500 border-b border-white/5 pb-4">Deployment Metadata</h3>
+        {/* Sidebar Info */}
+        <div className="space-y-8">
+          <div className="glass-card p-6 space-y-8 border-white/5">
+            <h3 className="text-xs font-black uppercase tracking-widest text-zinc-600 border-b border-white/5 pb-4">Pipeline Details</h3>
+            
             <div className="space-y-6">
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Branch</p>
-                <div className="flex items-center gap-2 text-sm text-white font-medium">
-                  <GitBranch className="w-4 h-4 text-zinc-500" /> {deployment?.project?.branch || 'main'}
+              <div className="group">
+                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2 group-hover:text-zinc-300 transition-colors">Project Source</p>
+                <div className="flex items-center gap-3 text-sm text-white font-bold bg-white/5 p-3 rounded-xl border border-white/5 group-hover:border-white/10 transition-all">
+                  <GitBranch className="w-4 h-4 text-emerald-500" /> 
+                  <span className="truncate">{deployment?.project?.repoUrl?.split('/').pop()}</span>
                 </div>
               </div>
+
               <div>
-                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Repository URL</p>
-                <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 break-all bg-white/5 p-2 rounded">
-                  {deployment?.project?.repoUrl || 'Fetching...'}
+                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Build Environment</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs bg-white/5 p-2 rounded-lg border border-white/5">
+                    <span className="text-zinc-500">Runtime</span>
+                    <span className="text-white font-bold italic">Node.js 20.x</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs bg-white/5 p-2 rounded-lg border border-white/5">
+                    <span className="text-zinc-500">Framework</span>
+                    <span className="text-white font-bold uppercase tracking-tighter">{deployment?.project?.framework || 'Auto'}</span>
+                  </div>
                 </div>
               </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Environment</p>
-                <span className="inline-flex text-sm bg-blue-500/10 text-blue-400 px-2 py-1 rounded text-[10px] font-bold border border-blue-500/20 uppercase tracking-widest">
-                  Production
-                </span>
+
+              <div className="pt-4 border-t border-white/5">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-600 tracking-[0.2em] mb-4">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Nodes
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className={cn(
+                      "h-1 rounded-full",
+                      i < 5 ? "bg-emerald-500/40" : "bg-white/5"
+                    )} />
+                  ))}
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="glass-card p-6 border-white/5 bg-blue-500/5">
+            <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Zap className="w-3.5 h-3.5" /> Fast Refresh
+            </h4>
+            <p className="text-[11px] text-zinc-500 leading-relaxed">
+              This deployment is protected by our global edge network. Your assets are automatically cached in 200+ cities for sub-10ms response times.
+            </p>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
