@@ -8,6 +8,7 @@ const router = Router();
 router.post('/', deploymentController.triggerDeploy);
 router.get('/', deploymentController.listDeployments);
 router.get('/:deploymentId', deploymentController.getDeployment);
+router.get('/:deploymentId/status', deploymentController.getDeploymentStatus);
 router.get('/:deploymentId/logs', deploymentController.getLogs);
 
 router.use(authenticate);

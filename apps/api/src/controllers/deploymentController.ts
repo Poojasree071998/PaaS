@@ -141,3 +141,23 @@ export const getChecks = async (req: Request, res: Response, next: NextFunction)
     next(error);
   }
 };
+
+export const getDeploymentStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { deploymentId } = req.params;
+    const isRunning = BuildService.isProcessRunning(deploymentId);
+    const port = BuildService.getRunningPort(deploymentId);
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        deploymentId, 
+        isProcessRunning: isRunning,
+        port: port,
+        status: isRunning ? 'ACTIVE' : 'STOPPED'
+      } 
+    });
+  } catch (error) {
+    next(error);
+  }
+};

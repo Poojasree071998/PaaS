@@ -232,4 +232,13 @@ export class BuildService {
   static getRunningPort(deploymentId: string): number | null {
     return runningProcesses.get(deploymentId)?.port || null;
   }
+
+  static isProcessRunning(deploymentId: string): boolean {
+    const proc = runningProcesses.get(deploymentId);
+    return !!(proc && proc.process && !proc.process.killed);
+  }
+
+  static getActiveProcessCount(): number {
+    return runningProcesses.size;
+  }
 }

@@ -70,7 +70,10 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
         method: req.method,
         headers: { ...req.headers, host: 'localhost:' + runningPort }
       }, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+        res.writeHead(proxyRes.statusCode || 200, {
+          ...proxyRes.headers,
+          'X-DeployFlow-Proxied': 'true'
+        });
         proxyRes.pipe(res);
       });
 
