@@ -112,6 +112,28 @@ export class BuildService {
         await this.log(deploymentId, `✅ Fresh repository cloned.`, LogLevel.INFO);
       }
 
+      // --- ENVIRONMENT GATHERING ---
+      const projectDatabases = await prisma.managedDatabase.findMany({
+        where: { projectId: deployment.projectId }
+      });
+
+      const env: Record<string, string> = {
+        NODE_ENV: 'production',
+        PORT: '3000',
+        ...Object.fromEntries(deployment.project.envVars.map((v: any) => [v.key, v.value])),
+      };
+
+      // Auto-inject database credentials
+      projectDatabases.forEach(db => {
+        if (db.type === 'POSTGRES') env.DATABASE_URL = db.connectionString;
+        if (db.type === 'REDIS') env.REDIS_URL = db.connectionString;
+        if (db.type === 'MONGODB') env.MONGODB_URI = db.connectionString;
+        // Also inject as generic names for compatibility
+        env[`DB_${db.name.toUpperCase()}_URL`] = db.connectionString;
+      });
+
+      await this.log(deploymentId, `✅ Environment initialized with ${projectDatabases.length} database(s).`, LogLevel.INFO);
+
       let workingDir = buildDir;
       if (deployment.project.rootDirectory && deployment.project.rootDirectory !== './') {
         workingDir = path.join(buildDir, deployment.project.rootDirectory.replace(/^\.\//, ''));
@@ -136,7 +158,7 @@ export class BuildService {
         'npm', 
         ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'error'], 
         workingDir, 
-        { NODE_ENV: 'development' }, 
+        env, 
         1200000
       );
       await this.log(deploymentId, `✅ Dependencies synchronized.`, LogLevel.INFO);
@@ -144,7 +166,7 @@ export class BuildService {
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
       
-      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, { NODE_ENV: 'development' }, 1200000); // 20 min timeout
+      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, env, 1200000); // 20 min timeout
 
       // --- SUCCESS ---
       let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
