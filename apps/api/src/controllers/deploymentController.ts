@@ -1,3 +1,7 @@
+import { Request, Response, NextFunction } from 'express';
+import prisma from '../config/prisma';
+import { BuildService } from '../services/buildService';
+import { Framework, RepoProvider } from '@prisma/client';
 import { AnalysisService } from '../services/analysisService';
 
 export const analyzeProject = async (req: Request, res: Response, next: NextFunction) => {
