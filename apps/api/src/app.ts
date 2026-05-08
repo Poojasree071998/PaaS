@@ -34,7 +34,14 @@ app.set('case sensitive routing', false);
 app.use(helmet({
   contentSecurityPolicy: false, 
 }));
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://deployflow-web.onrender.com", 
+    "http://localhost:3000",
+    "http://localhost:5173"
+  ],
+  credentials: true
+}));
 app.use(standardRateLimiter);
 
 // Logging

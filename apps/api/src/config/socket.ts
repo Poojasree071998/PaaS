@@ -6,9 +6,15 @@ let io: Server;
 export const initSocket = (server: HttpServer) => {
   io = new Server(server, {
     cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
+      origin: [
+        "https://deployflow-web.onrender.com", 
+        "http://localhost:3000",
+        "http://localhost:5173"
+      ],
+      methods: ["GET", "POST"],
+      credentials: true
     },
+    transports: ['websocket', 'polling']
   });
 
   io.on('connection', (socket) => {
