@@ -132,9 +132,10 @@ export class BuildService {
 
       // Auto-inject database credentials
       projectDatabases.forEach(db => {
-        if (db.type === DatabaseType.POSTGRES) env.DATABASE_URL = db.connectionString;
-        if (db.type === DatabaseType.REDIS) env.REDIS_URL = db.connectionString;
-        if (db.type === DatabaseType.MONGODB) env.MONGODB_URI = db.connectionString;
+        const dbType = db.type as string;
+        if (dbType === 'POSTGRES') env.DATABASE_URL = db.connectionString;
+        if (dbType === 'REDIS') env.REDIS_URL = db.connectionString;
+        if (dbType === 'MONGODB') env.MONGODB_URI = db.connectionString;
         // Also inject as generic names for compatibility
         env[`DB_${db.name.toUpperCase()}_URL`] = db.connectionString;
       });
