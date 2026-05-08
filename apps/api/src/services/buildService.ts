@@ -5,7 +5,7 @@ import fsPromises from 'fs/promises';
 import { spawn } from 'child_process';
 import prisma from '../config/prisma';
 import logger from '../config/logger';
-import { DeploymentStatus, LogLevel } from '@prisma/client';
+import { DeploymentStatus, LogLevel, DatabaseType } from '@prisma/client';
 import { getIO } from '../config/socket';
 import { Framework } from '@prisma/client';
 import { buildQueue } from '../queues';
@@ -132,9 +132,9 @@ export class BuildService {
 
       // Auto-inject database credentials
       projectDatabases.forEach(db => {
-        if (db.type === 'POSTGRES') env.DATABASE_URL = db.connectionString;
-        if (db.type === 'REDIS') env.REDIS_URL = db.connectionString;
-        if (db.type === 'MONGODB') env.MONGODB_URI = db.connectionString;
+        if (db.type === DatabaseType.POSTGRES) env.DATABASE_URL = db.connectionString;
+        if (db.type === DatabaseType.REDIS) env.REDIS_URL = db.connectionString;
+        if (db.type === DatabaseType.MONGODB) env.MONGODB_URI = db.connectionString;
         // Also inject as generic names for compatibility
         env[`DB_${db.name.toUpperCase()}_URL`] = db.connectionString;
       });
