@@ -11,6 +11,7 @@ import { Framework } from '@prisma/client';
 import { buildQueue } from '../queues';
 
 const runningProcesses = new Map<string, any>(); // deploymentId -> { process, port }
+const buildingDeployments = new Set<string>(); // deploymentId
 
 export class BuildService {
   static async triggerBuild(projectId: string, userId: string, branch: string = 'main') {
@@ -42,6 +43,11 @@ export class BuildService {
   }
 
   static async runBuild(deploymentId: string) {
+    if (buildingDeployments.has(deploymentId)) {
+      logger.warn(`Build already in progress for deployment ${deploymentId}, skipping.`);
+      return;
+    }
+
     const deployment = await prisma.deployment.findUnique({
       where: { id: deploymentId },
       include: { project: true },
@@ -49,6 +55,17 @@ export class BuildService {
 
     if (!deployment) return;
 
+    // Kill any existing process BEFORE starting build to free up files
+    const existing = runningProcesses.get(deploymentId);
+    if (existing && existing.process) {
+      logger.info(`Killing existing process for deployment ${deploymentId} before rebuild.`);
+      try {
+        existing.process.kill('SIGKILL');
+      } catch (e) {}
+      runningProcesses.delete(deploymentId);
+    }
+
+    buildingDeployments.add(deploymentId);
     const buildDir = path.join(process.cwd(), 'temp-builds', deploymentId);
     
     try {
@@ -167,6 +184,8 @@ export class BuildService {
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.ERROR);
       await this.log(deploymentId, `❌ FAILED: ${error.message}`, LogLevel.ERROR);
+    } finally {
+      buildingDeployments.delete(deploymentId);
     }
   }
 
