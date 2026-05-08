@@ -147,6 +147,10 @@ export class BuildService {
         workingDir = path.join(buildDir, deployment.project.rootDirectory.replace(/^\.\//, ''));
       }
 
+      // Inject local bin to PATH so 'vite', 'next', etc are found
+      const localBin = path.join(workingDir, 'node_modules', '.bin');
+      env.PATH = `${localBin}${path.delimiter}${process.env.PATH}`;
+
       // --- SMART INSTALL ENGINE (FAST DEPLOYMENT) ---
       const pkgPath = path.join(workingDir, 'package.json');
       const lockPath = path.join(workingDir, 'package-lock.json');
