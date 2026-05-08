@@ -1,7 +1,16 @@
-import { Request, Response, NextFunction } from 'express';
-import prisma from '../config/prisma';
-import { BuildService } from '../services/buildService';
-import { Framework, RepoProvider } from '@prisma/client';
+import { AnalysisService } from '../services/analysisService';
+
+export const analyzeProject = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { repoUrl } = req.body;
+    if (!repoUrl) return res.status(400).json({ success: false, message: 'Repo URL is required' });
+
+    const analysis = await AnalysisService.analyzeRepository(repoUrl);
+    res.json({ success: true, data: analysis });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const triggerDeploy = async (req: Request, res: Response, next: NextFunction) => {
   try {

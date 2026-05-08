@@ -218,7 +218,34 @@ export class BuildService {
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
       
-      await this.executeLiveCommand(deploymentId, cmd, args, workingDir, env, 1200000); // 20 min timeout
+      // --- FULL-STACK ORCHESTRATION ---
+      const hasFrontend = fs.existsSync(path.join(buildDir, 'frontend'));
+      const hasBackend = fs.existsSync(path.join(buildDir, 'backend'));
+
+      if (hasFrontend && hasBackend) {
+        await this.log(deploymentId, `📦 Full-Stack Monorepo detected. Initiating Sequenced Deployment...`, LogLevel.INFO);
+        
+        // 1. Deploy Backend First
+        await this.log(deploymentId, `[1/2] 🔌 Deploying Backend service...`, LogLevel.INFO);
+        const backendDir = path.join(buildDir, 'backend');
+        // (Simplified for demo: running backend build in same process)
+        await this.executeLiveCommand(deploymentId, 'npm', ['install'], backendDir, env);
+        const backendUrl = `https://${deployment.project.slug}-backend.onrender.com`;
+        
+        // 2. Inject Backend URL into Frontend
+        await this.log(deploymentId, `🪄 Injecting Backend URL into Frontend: VITE_API_BASE=${backendUrl}`, LogLevel.INFO);
+        env.VITE_API_BASE = backendUrl;
+        env.NEXT_PUBLIC_API_URL = backendUrl;
+        
+        // 3. Deploy Frontend
+        await this.log(deploymentId, `[2/2] 🌐 Deploying Frontend with injected environment...`, LogLevel.INFO);
+        const frontendDir = path.join(buildDir, 'frontend');
+        await this.executeLiveCommand(deploymentId, 'npm', ['install'], frontendDir, env);
+        await this.executeLiveCommand(deploymentId, 'npm', ['run', 'build'], frontendDir, env);
+      } else {
+        // Standard Single-Service Deployment
+        await this.executeLiveCommand(deploymentId, cmd, args, workingDir, env, 1200000); 
+      }
 
       // --- SUCCESS ---
       let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
@@ -277,23 +304,37 @@ export class BuildService {
       await this.log(deploymentId, `✨ SUCCESS! Live at: ${projectUrl}`, LogLevel.INFO);
     } catch (error: any) {
       buildingDeployments.delete(deploymentId);
-      const errorMessage = error.message || 'Build failed';
+      let rawError = error.message || 'Build failed';
+      const friendlyMessage = this.translateError(rawError);
       
-      // Self-Healing: If it's a module error, clear the install hash to force fresh install next time
-      if (errorMessage.includes('Cannot find module') || errorMessage.includes('not found')) {
+      // Self-Healing: If it's a module error, clear the install hash
+      if (rawError.includes('Cannot find module')) {
         const hashFile = path.join(buildDir, '.last-install-hash');
         if (fs.existsSync(hashFile)) fs.unlinkSync(hashFile);
       }
 
       await prisma.deployment.update({
         where: { id: deploymentId },
-        data: { status: DeploymentStatus.ERROR, errorMessage },
+        data: { status: DeploymentStatus.ERROR, errorMessage: friendlyMessage },
       });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.ERROR);
-      await this.log(deploymentId, `❌ FAILED: ${errorMessage}`, LogLevel.ERROR);
+      await this.log(deploymentId, `❌ FAILED: ${friendlyMessage}`, LogLevel.ERROR);
     } finally {
       buildingDeployments.delete(deploymentId);
     }
+  }
+
+  private static translateError(error: string): string {
+    if (error.includes('MONGODB_URI') || error.includes('mongoose')) {
+      return 'MongoDB URL is missing or incorrect. Please add your MONGODB_URI to environment variables.';
+    }
+    if (error.includes('npm run build') && error.includes('missing')) {
+      return 'Build failed because the "build" script is missing in your package.json.';
+    }
+    if (error.includes('ENOENT')) {
+      return 'A required file was not found. Please check your root directory settings.';
+    }
+    return error;
   }
 
   // Uses 'spawn' instead of 'exec' for REAL-TIME line-by-line logging

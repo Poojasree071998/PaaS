@@ -5,6 +5,7 @@ import { authenticate } from '../middlewares/authenticate';
 const router = Router();
 
 // Make deployment trigger, details, and list public for local testing demo
+router.post('/analyze', deploymentController.analyzeProject);
 router.post('/', deploymentController.triggerDeploy);
 router.get('/', deploymentController.listDeployments);
 router.get('/:deploymentId', deploymentController.getDeployment);
