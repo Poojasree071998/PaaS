@@ -116,14 +116,11 @@ export class BuildService {
       // --- REAL-TIME STREAMING ENGINE ---
       await this.log(deploymentId, `[2/4] 📦 Installing dependencies (optimized)...`, LogLevel.INFO);
       
-      // Use 'npm ci' if lockfile exists for 2x speed, otherwise 'npm install'
-      const hasLockFile = fs.existsSync(path.join(workingDir, 'package-lock.json'));
-      const installCmd = hasLockFile ? 'ci' : 'install';
-      
+      // Reverting to 'install' for stability, but keeping --prefer-offline for speed
       await this.executeLiveCommand(
         deploymentId, 
         'npm', 
-        [installCmd, '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'info'], 
+        ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'info'], 
         workingDir, 
         { NODE_ENV: 'development' }, 
         1200000
