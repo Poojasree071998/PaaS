@@ -84,20 +84,20 @@ export class BuildService {
 
       await this.log(deploymentId, `[1/4] 📥 Fetching updates...`, LogLevel.INFO);
       
-      // Ensure the build directory exists BEFORE initializing git
       if (!fs.existsSync(buildDir)) {
         await fsPromises.mkdir(buildDir, { recursive: true });
       }
 
-      const git = simpleGit({ baseDir: buildDir, binary: 'git' });
+      const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: 'true' };
       
       if (fs.existsSync(path.join(buildDir, '.git'))) {
         await this.log(deploymentId, `♻️ Project folder exists, pulling latest changes...`, LogLevel.INFO);
-        await git.fetch();
-        await git.reset(['--hard', `origin/${deployment.branch}`]);
+        await this.executeLiveCommand(deploymentId, 'git', ['fetch', '--all'], buildDir, gitEnv, 60000);
+        await this.executeLiveCommand(deploymentId, 'git', ['reset', '--hard', `origin/${deployment.branch}`], buildDir, gitEnv, 30000);
         await this.log(deploymentId, `✅ Project updated via incremental pull.`, LogLevel.INFO);
       } else {
-        await git.clone(deployment.project.repoUrl, '.', ['--depth', '1', '-b', deployment.branch]);
+        await this.log(deploymentId, `📦 Cloning fresh repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
+        await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
         await this.log(deploymentId, `✅ Fresh repository cloned.`, LogLevel.INFO);
       }
 
