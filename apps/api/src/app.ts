@@ -78,7 +78,7 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
     }
 
     // --- REVERSE PROXY FOR BACKENDS ---
-    const runningPort = (deployment.meta as any)?.port || BuildService.getRunningPort(id);
+    const runningPort = BuildService.getRunningPort(id) || (deployment.meta as any)?.port;
     if (runningPort) {
       const proxyReq = http.request({
         host: 'localhost',
