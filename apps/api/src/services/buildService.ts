@@ -151,29 +151,37 @@ export class BuildService {
       const localBin = path.join(workingDir, 'node_modules', '.bin');
       env.PATH = `${localBin}${path.delimiter}${process.env.PATH}`;
 
-      // --- SMART INSTALL ENGINE (FAST DEPLOYMENT) ---
+      // --- LIGHTNING-FAST INSTALL ENGINE ---
       const pkgPath = path.join(workingDir, 'package.json');
-      const lockPath = path.join(workingDir, 'package-lock.json');
-      const pkgHash = fs.existsSync(pkgPath) ? fs.readFileSync(pkgPath, 'utf8') : '';
+      const hashFile = path.join(workingDir, '.last-install-hash');
       
-      await this.log(deploymentId, `[2/4] 📦 Checking dependencies...`, LogLevel.INFO);
-      
-      // If node_modules exists, we try an incremental update
-      const modulesExist = fs.existsSync(path.join(workingDir, 'node_modules'));
-      
-      if (modulesExist) {
-        await this.log(deploymentId, `⚡ Persistent node_modules found. Running fast sync...`, LogLevel.INFO);
+      let shouldInstall = true;
+      if (fs.existsSync(pkgPath) && fs.existsSync(path.join(workingDir, 'node_modules'))) {
+        const currentHash = require('crypto').createHash('md5').update(fs.readFileSync(pkgPath)).digest('hex');
+        const lastHash = fs.existsSync(hashFile) ? fs.readFileSync(hashFile, 'utf8') : '';
+        
+        if (currentHash === lastHash) {
+          await this.log(deploymentId, `⚡ Fast-Track: package.json unchanged. Skipping install phase!`, LogLevel.INFO);
+          shouldInstall = false;
+        } else {
+          fs.writeFileSync(hashFile, currentHash);
+        }
       }
 
-      await this.executeLiveCommand(
-        deploymentId, 
-        'npm', 
-        ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'error'], 
-        workingDir, 
-        env, 
-        1200000
-      );
-      await this.log(deploymentId, `✅ Dependencies synchronized.`, LogLevel.INFO);
+      if (shouldInstall) {
+        await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies...`, LogLevel.INFO);
+        await this.executeLiveCommand(
+          deploymentId, 
+          'npm', 
+          ['install', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'error'], 
+          workingDir, 
+          env, 
+          1200000
+        );
+        await this.log(deploymentId, `✅ Dependencies synchronized.`, LogLevel.INFO);
+      }
+
+      await this.log(deploymentId, `[3/4] 🔨 Building project...`, LogLevel.INFO);
       const buildParts = (deployment.project.buildCommand || 'npm run build').split(' ');
       const cmd = buildParts[0];
       const args = buildParts.slice(1);
