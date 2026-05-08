@@ -111,11 +111,6 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       return;
     }
 
-    const buildRoot = path.join(process.cwd(), 'temp-builds', id);
-    if (!fs.existsSync(buildRoot)) {
-      return res.status(404).send('<h1>Deployment files missing</h1><p>The build files for this deployment are no longer available on this server.</p>');
-    }
-
     // 2. Resolve the actual project folder (handling monorepos)
     let projectPath = buildRoot;
     if (deployment.project.rootDirectory && deployment.project.rootDirectory !== './') {
