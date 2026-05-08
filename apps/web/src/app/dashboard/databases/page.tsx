@@ -58,6 +58,7 @@ export default function DatabasesPage() {
   };
 
   const handleCreate = async () => {
+    if (!newName) return;
     setCreating(true);
     try {
       const apiUrl = getApiUrl();
@@ -67,17 +68,20 @@ export default function DatabasesPage() {
         body: JSON.stringify({ 
           name: newName, 
           type: newType,
-          teamId: 'default' // Simplified
+          teamId: 'default' 
         }),
       });
       const data = await res.json();
       if (data.success) {
-        setDatabases([...databases, data.data]);
+        // Force refresh the list
+        await fetchDatabases();
         setShowCreate(false);
         setNewName('');
+      } else {
+        alert('Creation failed: ' + data.message);
       }
     } catch (error) {
-      alert('Failed to create database.');
+      alert('Failed to create database. Please check if the API is running.');
     } finally {
       setCreating(false);
     }
