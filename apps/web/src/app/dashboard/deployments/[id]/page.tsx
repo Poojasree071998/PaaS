@@ -15,7 +15,8 @@ import {
   Folder,
   Zap,
   Clock,
-  ChevronRight
+  ChevronRight,
+  ArrowUpRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { getApiUrl, getSocketUrl } from '@/lib/api';
