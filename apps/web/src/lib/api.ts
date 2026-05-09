@@ -1,7 +1,7 @@
 export const getApiUrl = () => {
-  // Use relative path for Netlify Proxy to bypass CORS and Render build limits
+  // Use relative path for Netlify Proxy
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return window.location.origin + '/api';
+    return window.location.origin;
   }
 
   // Handle local development
