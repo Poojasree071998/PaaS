@@ -1,3 +1,4 @@
+export const getApiUrl = () => {
   // Default to production API if no env var is provided
   let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://deployflow-api.onrender.com';
   
