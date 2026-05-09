@@ -18,7 +18,9 @@
     "db:push": "npx prisma db push --schema ./packages/db/prisma/schema.prisma --accept-data-loss"
   },
   "devDependencies": {
+    "@prisma/client": "^7.8.0",
     "prettier": "^3.0.0",
+    "prisma": "^7.8.0",
     "turbo": "latest",
     "typescript": "^5.0.0"
   },
