@@ -205,6 +205,7 @@ export class BuildService {
         await this.log(deploymentId, `✅ Dependencies synchronized.`, LogLevel.INFO);
       }
 
+      // --- STEP 6: BUILD PROCESS ---
       await this.log(deploymentId, `[3/4] 🔨 Building project...`, LogLevel.INFO);
       
       // --- MAGIC CODE PATCHER (Zero-Config DB) ---
@@ -214,18 +215,28 @@ export class BuildService {
         await this.log(deploymentId, `⚠️ Code patching skipped: ${e.message}`, LogLevel.WARN);
       }
 
-      // --- STEP 6: AUTOMATIC BUILD PROCESS (ISOLATED) ---
-      await this.log(deploymentId, `🚀 Initializing isolated build environment (Docker Sandbox)...`, LogLevel.INFO);
-      await this.log(deploymentId, `📦 Cloning repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
-      
-      // Auto-detect commands if not provided
-      const cmd = buildCommand || 'npm install && npm run build';
-      const buildParts = cmd.split('&&').map(c => c.trim());
-      
-      // Execute build sequence
-      for (const part of buildParts) {
-        const [pCmd, ...pArgs] = part.split(' ');
-        await this.executeLiveCommand(deploymentId, pCmd, pArgs, workingDir, env, 1200000);
+      // Execute build command
+      if (buildCommand && buildCommand !== 'SKIP') {
+        const buildParts = buildCommand.split('&&').map(c => c.trim());
+        for (const part of buildParts) {
+          // If the user included npm install in their command, skip it if we already did it
+          if (part.startsWith('npm install') && !shouldInstall) {
+            await this.log(deploymentId, `⚡ Skipping redundant '${part}' as dependencies are already synced.`, LogLevel.INFO);
+            continue;
+          }
+          
+          await this.log(deploymentId, `🏃 Running: ${part}`, LogLevel.INFO);
+          await this.executeLiveCommand(deploymentId, part, [], workingDir, env, 1200000);
+        }
+      } else if (!buildCommand) {
+        // Fallback for zero-config build
+        if (fs.existsSync(pkgPath)) {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          if (pkg.scripts?.build) {
+            await this.log(deploymentId, `🏃 Running: npm run build`, LogLevel.INFO);
+            await this.executeLiveCommand(deploymentId, 'npm run build', [], workingDir, env, 1200000);
+          }
+        }
       }
 
       // --- STEP 7 & 8: START BACKEND / SERVE FRONTEND ---
@@ -332,6 +343,9 @@ export class BuildService {
   // Uses 'spawn' instead of 'exec' for REAL-TIME line-by-line logging
   private static async executeLiveCommand(deploymentId: string, command: string, args: string[], cwd: string, env: any = {}, timeoutMs: number = 300000) {
     return new Promise((resolve, reject) => {
+      // If args is empty, assume command is the full string to run in shell
+      const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+      
       const child = spawn(command, args, { 
         cwd, 
         shell: true,
@@ -339,7 +353,7 @@ export class BuildService {
       });
       
       const timeout = setTimeout(() => {
-        child.kill();
+        child.kill('SIGKILL'); // Force kill on timeout
         reject(new Error(`Command timed out after ${timeoutMs / 1000}s`));
       }, timeoutMs);
 
@@ -353,6 +367,7 @@ export class BuildService {
       child.stderr.on('data', (data) => {
         const lines = data.toString().split('\n');
         lines.forEach((line: string) => {
+          // Some tools use stderr for info/warnings, so we log as WARN
           if (line.trim()) this.log(deploymentId, line.trim(), LogLevel.WARN);
         });
       });
