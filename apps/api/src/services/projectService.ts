@@ -65,7 +65,14 @@ export class ProjectService {
 
     return prisma.project.findMany({
       where: { teamId },
-      include: { _count: { select: { deployments: true, domains: true } } }
+      include: { 
+        _count: { select: { deployments: true, domains: true } },
+        deployments: {
+          where: { status: 'READY' },
+          orderBy: { readyAt: 'desc' },
+          take: 1
+        }
+      }
     });
   }
 
