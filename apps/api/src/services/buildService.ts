@@ -101,20 +101,24 @@ export class BuildService {
         await this.executeLiveCommand(deploymentId, 'git', ['reset', '--hard', `origin/${deployment.branch}`], buildDir, gitEnv, 30000);
         await this.log(deploymentId, `✅ Project updated via incremental pull.`, LogLevel.INFO);
       } else {
-        await this.log(deploymentId, `📦 Cloning fresh repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
+        await this.log(deploymentId, `📦 Cloning repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
         try {
+          // Attempt 1: Try the specified branch
           await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
         } catch (err) {
-          await this.log(deploymentId, `⚠️ Branch '${deployment.branch}' not found. Cleaning up for fallback...`, LogLevel.WARN);
-          // Wipe the directory contents to ensure fallback clone works on an empty path
+          await this.log(deploymentId, `⚠️ Branch '${deployment.branch}' not found. Checking default branch...`, LogLevel.WARN);
+          
+          // Cleanup
           const files = await fsPromises.readdir(buildDir);
           for (const file of files) {
             await fsPromises.rm(path.join(buildDir, file), { recursive: true, force: true }).catch(() => {});
           }
-          await this.log(deploymentId, `🔄 Attempting to clone default branch...`, LogLevel.INFO);
+
+          // Attempt 2: Just clone and let Git pick the default branch
+          await this.log(deploymentId, `🔄 Falling back to default branch (master/main)...`, LogLevel.INFO);
           await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
         }
-        await this.log(deploymentId, `✅ Fresh repository cloned.`, LogLevel.INFO);
+        await this.log(deploymentId, `✅ Repository successfully cloned.`, LogLevel.INFO);
       }
 
       // --- ENVIRONMENT GATHERING ---
