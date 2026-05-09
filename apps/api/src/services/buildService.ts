@@ -207,10 +207,18 @@ export class BuildService {
       }
 
       if (shouldInstall) {
+        const pkg = JSON.parse(pkgContent.toString());
+        const isMonorepo = !!pkg.workspaces;
         const hasLock = fs.existsSync(lockPath);
-        const installCmd = hasLock ? 'ci' : 'install';
         
-        await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies using ${hasLock ? 'npm ci' : 'npm install'}...`, LogLevel.INFO);
+        // Strategy: standard projects use fast 'ci', monorepos use reliable 'install'
+        const installCmd = (isMonorepo || !hasLock) ? 'install' : 'ci';
+        
+        if (isMonorepo) {
+          await this.log(deploymentId, `📦 Monorepo Detected (npm workspaces). Using reliable install strategy...`, LogLevel.INFO);
+        } else {
+          await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies using ${hasLock ? 'npm ci' : 'npm install'}...`, LogLevel.INFO);
+        }
         
         const npmArgs = [
           installCmd,
