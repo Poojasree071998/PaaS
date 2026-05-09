@@ -222,11 +222,11 @@ export class BuildService {
         ];
 
         try {
-          await this.executeLiveCommand(deploymentId, 'npm', npmArgs, workingDir, env, 300000);
+          await this.executeLiveCommand(deploymentId, 'npm', npmArgs, workingDir, env, 1200000);
         } catch (error) {
           if (hasLock) {
             await this.log(deploymentId, `⚠️ npm ci failed. Falling back to standard npm install...`, LogLevel.WARN);
-            await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 300000);
+            await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
           } else {
             throw error;
           }
