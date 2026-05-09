@@ -9,5 +9,6 @@ export const getApiUrl = () => {
 };
 
 export const getSocketUrl = () => {
-  return getApiUrl();
+  // WebSockets should connect directly to Render for real-time performance
+  return 'https://deployflow-api.onrender.com';
 };

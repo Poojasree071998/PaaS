@@ -1,2 +1,1 @@
 /api/*  https://deployflow-api.onrender.com/api/:splat  200
-/socket.io/*  https://deployflow-api.onrender.com/socket.io/:splat  200
