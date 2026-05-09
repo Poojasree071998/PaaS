@@ -46,12 +46,7 @@ app.use(helmet({
   contentSecurityPolicy: false, 
 }));
 app.use(cors({
-  origin: [
-    "https://deployflow-web.onrender.com", 
-    "https://bejewelled-griffin-055a6f.netlify.app",
-    "http://localhost:3000",
-    "http://localhost:5173"
-  ],
+  origin: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
