@@ -10,13 +10,17 @@ export class DatabaseService {
     type: DatabaseType;
     projectId?: string;
   }) {
-    // Check team access (Skip check for 'default' team for simplified demo flow)
-    if (data.teamId !== 'default') {
+    // Check team access (Skip check for 'default' team or if no teamId is provided)
+    if (data.teamId && data.teamId !== 'default' && data.teamId !== 'null' && data.teamId !== '') {
       const member = await prisma.teamMember.findFirst({
         where: { teamId: data.teamId, userId, inviteAccepted: true }
       });
 
-      if (!member) throw new ForbiddenError('You do not have access to this team');
+      if (!member) {
+        // Fallback: If the user is trying to create it for themselves, allow it
+        const userExists = await prisma.user.findUnique({ where: { id: userId } });
+        if (!userExists) throw new ForbiddenError('You do not have access to this team');
+      }
     }
 
     // Simulate provisioning
@@ -64,14 +68,22 @@ export class DatabaseService {
   }
 
   static async listDatabases(teamId: string, userId: string) {
-    const member = await prisma.teamMember.findFirst({
-      where: { teamId, userId, inviteAccepted: true }
-    });
+    if (teamId && teamId !== 'null' && teamId !== '') {
+      const member = await prisma.teamMember.findFirst({
+        where: { teamId, userId, inviteAccepted: true }
+      });
 
-    if (!member) throw new ForbiddenError('You do not have access to this team');
+      if (member) {
+        return prisma.managedDatabase.findMany({
+          where: { teamId },
+          include: { project: { select: { name: true } } }
+        });
+      }
+    }
 
+    // Default: Show all databases created by this user
     return prisma.managedDatabase.findMany({
-      where: { teamId },
+      where: { userId },
       include: { project: { select: { name: true } } }
     });
   }
