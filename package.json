@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
-    "build": "turbo run build",
+    "build": "turbo run build --force",
     "start": "turbo run start",
     "lint": "turbo run lint",
     "docker:up": "docker-compose up -d",
