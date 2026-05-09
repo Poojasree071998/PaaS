@@ -1,18 +1,11 @@
 export const getApiUrl = () => {
-  // Default to production API if no env var is provided
-  let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://deployflow-api.onrender.com';
-  
-  // Handle local development if hostname is localhost
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-    return 'http://localhost:4000';
+  // Use relative path for Netlify Proxy to bypass CORS and Render build limits
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return window.location.origin + '/api';
   }
 
-  // Ensure it starts with https
-  if (!apiUrl.startsWith('http')) {
-    apiUrl = `https://${apiUrl}`;
-  }
-
-  return apiUrl;
+  // Handle local development
+  return 'http://localhost:4000';
 };
 
 export const getSocketUrl = () => {
