@@ -144,16 +144,40 @@ export const cancelDeployment = async (req: Request, res: Response, next: NextFu
 };
 
 export const rollbackDeployment = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    res.json({ success: true, message: 'Rollback triggered (mock)' });
-  } catch (error) {
-    next(error);
-  }
+  // Rollback is essentially promoting a previous version
+  return promoteDeployment(req, res, next);
 };
 
 export const promoteDeployment = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    res.json({ success: true, message: 'Deployment promoted (mock)' });
+    const { deploymentId } = req.params;
+    
+    const deployment = await prisma.deployment.findUnique({
+      where: { id: deploymentId },
+      include: { project: true }
+    });
+
+    if (!deployment) return res.status(404).json({ success: false, message: 'Deployment not found' });
+    if (deployment.status !== 'READY') return res.status(400).json({ success: false, message: 'Only READY deployments can be promoted' });
+
+    // Update project production pointer
+    await prisma.project.update({
+      where: { id: deployment.projectId },
+      data: { productionDeploymentId: deploymentId }
+    });
+
+    // Ensure it is running
+    await BuildService.ensureRunning(deploymentId);
+
+    res.json({ 
+      success: true, 
+      message: 'Deployment promoted to production successfully',
+      data: { 
+        deploymentId,
+        projectId: deployment.projectId,
+        url: deployment.url
+      } 
+    });
   } catch (error) {
     next(error);
   }

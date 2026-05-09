@@ -51,6 +51,33 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// --- PERMANENT PRODUCTION ROUTER ---
+app.get('/p/:slug/:subPath(*)?', async (req, res) => {
+  const { slug } = req.params;
+  const subPath = (req.params as any).subPath || '';
+
+  try {
+    const project = await prisma.project.findFirst({
+      where: { slug },
+      include: { productionDeployment: true }
+    });
+
+    if (!project || !project.productionDeploymentId) {
+      return res.status(404).send('<h1>Project not found or no production deployment set</h1>');
+    }
+
+    // Ensure the production deployment is running
+    await BuildService.ensureRunning(project.productionDeploymentId);
+
+    // Redirect internal request to the live deployment handler
+    req.params.id = project.productionDeploymentId;
+    return (app as any)._router.handle(req, res, () => {});
+  } catch (error) {
+    logger.error('Production Routing error:', error);
+    res.status(500).send('Internal Server Error during production routing.');
+  }
+});
+
 // --- PROJECT-AWARE LIVE HOSTING ENGINE ---
 app.get('/live/:id/:subPath(*)?', async (req, res) => {
   const { id } = req.params;

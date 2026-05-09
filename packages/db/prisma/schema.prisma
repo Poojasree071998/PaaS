@@ -200,6 +200,9 @@ model Project {
   webhooks        Webhook[]
   databases       ManagedDatabase[]
   
+  productionDeploymentId String? @unique
+  productionDeployment   Deployment? @relation("ProjectProduction", fields: [productionDeploymentId], references: [id])
+  
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -225,6 +228,7 @@ model Deployment {
   errorMessage    String?
   
   project         Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  producedProject Project?              @relation("ProjectProduction")
   team            Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user            User                  @relation(fields: [userId], references: [id])
   

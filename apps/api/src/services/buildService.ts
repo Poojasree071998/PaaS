@@ -315,40 +315,7 @@ export class BuildService {
         }
 
         await this.log(deploymentId, `🚀 Starting Backend Process...`, LogLevel.INFO);
-        
-        // Assign a random free port (3001-9999)
-        const port = Math.floor(Math.random() * 7000) + 3000;
-        
-        const startCmd = (deployment.project as any).startCommand || 'npm start';
-        const [cmd, ...args] = startCmd.split(' ');
-
-        const child = spawn(cmd, args, {
-          cwd: workingDir,
-          shell: true,
-          env: { ...process.env, PORT: port.toString(), NODE_ENV: 'production' }
-        });
-
-        runningProcesses.set(deploymentId, { process: child, port });
-
-        child.stdout.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.INFO));
-        child.stderr.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.WARN));
-
-        // --- HEALTH CHECK ENGINE ---
-        await this.log(deploymentId, `🔍 Performing health check on port ${port}...`, LogLevel.INFO);
-        const healthy = await this.pollHealth(port, 60); // Wait up to 60s
-        
-        if (!healthy) {
-          child.kill('SIGKILL');
-          runningProcesses.delete(deploymentId);
-          throw new Error(`Health check failed: Application did not respond on port ${port} within 60s. Ensure your app listens on process.env.PORT.`);
-        }
-
-        await prisma.deployment.update({
-          where: { id: deploymentId },
-          data: { meta: { port } }
-        });
-
-        await this.log(deploymentId, `🟢 SUCCESS: Application is healthy and live on port ${port}`, LogLevel.INFO);
+        await this.executeBackendProcess(deploymentId, deployment, workingDir, env);
       }
 
       await this.log(deploymentId, `✨ SUCCESS! Live at: ${projectUrl}`, LogLevel.INFO);
@@ -501,6 +468,97 @@ export class BuildService {
     if (patchedCount > 0) {
       await this.log(deploymentId, `🪄 Magic Patch: Automatically updated ${patchedCount} file(s) with your real Cloud Database links.`, LogLevel.INFO);
     }
+  }
+
+  static async ensureRunning(deploymentId: string) {
+    if (this.isProcessRunning(deploymentId)) return true;
+
+    const deployment = await prisma.deployment.findUnique({
+      where: { id: deploymentId },
+      include: { 
+        project: {
+          include: { envVars: true, databases: true }
+        } 
+      }
+    });
+
+    if (!deployment || deployment.status !== DeploymentStatus.READY) return false;
+
+    const buildDir = path.join(process.cwd(), 'temp-builds', deployment.projectId);
+    let workingDir = buildDir;
+    if (deployment.project.rootDirectory && deployment.project.rootDirectory !== './') {
+      workingDir = path.join(buildDir, deployment.project.rootDirectory.replace(/^\.\//, ''));
+    }
+
+    if (!fs.existsSync(workingDir)) {
+      // If files are gone, we must rebuild
+      this.runBuild(deploymentId).catch(() => {});
+      return false;
+    }
+
+    // Construct env
+    const env: any = {
+      NODE_ENV: 'production',
+      ...Object.fromEntries(deployment.project.envVars.map((v: any) => [v.key, v.value])),
+    };
+
+    // Inject database credentials
+    const projectDatabases = await prisma.managedDatabase.findMany({
+      where: { projectId: deployment.projectId }
+    });
+    projectDatabases.forEach(db => {
+      const dbType = db.type as string;
+      if (dbType === 'POSTGRES') env.DATABASE_URL = db.connectionString;
+      if (dbType === 'REDIS') env.REDIS_URL = db.connectionString;
+      if (dbType === 'MONGODB') env.MONGODB_URI = db.connectionString;
+    });
+
+    const localBin = path.join(workingDir, 'node_modules', '.bin');
+    env.PATH = `${localBin}${path.delimiter}${process.env.PATH}`;
+    env.npm_config_cache = path.join(process.cwd(), 'npm-cache');
+
+    await this.log(deploymentId, `🔄 Waking up deployment from disk...`, LogLevel.INFO);
+    
+    // We don't await this so it can run in background
+    this.executeBackendProcess(deploymentId, deployment, workingDir, env).catch(err => {
+      this.log(deploymentId, `❌ Failed to wake up: ${err.message}`, LogLevel.ERROR);
+    });
+
+    return true;
+  }
+
+  private static async executeBackendProcess(deploymentId: string, deployment: any, workingDir: string, env: any) {
+    const backendFrameworks: string[] = [Framework.EXPRESS, Framework.FASTAPI, Framework.DJANGO, Framework.RAILS, Framework.LARAVEL, Framework.NEXTJS];
+    if (!backendFrameworks.includes(deployment.project.framework as string)) return;
+
+    const port = Math.floor(Math.random() * 7000) + 3000;
+    const startCmd = deployment.project.startCommand || 'npm start';
+    const [cmd, ...args] = startCmd.split(' ');
+
+    const child = spawn(cmd, args, {
+      cwd: workingDir,
+      shell: true,
+      env: { ...process.env, ...env, PORT: port.toString(), NODE_ENV: 'production' }
+    });
+
+    runningProcesses.set(deploymentId, { process: child, port });
+
+    child.stdout.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.INFO));
+    child.stderr.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.WARN));
+
+    const healthy = await this.pollHealth(port, 60);
+    if (!healthy) {
+      child.kill('SIGKILL');
+      runningProcesses.delete(deploymentId);
+      throw new Error(`Health check failed after wakeup.`);
+    }
+
+    await prisma.deployment.update({
+      where: { id: deploymentId },
+      data: { meta: { port } }
+    });
+
+    await this.log(deploymentId, `🟢 SUCCESS: Application is back online on port ${port}`, LogLevel.INFO);
   }
 
   static async log(deploymentId: string, message: string, level: LogLevel) {

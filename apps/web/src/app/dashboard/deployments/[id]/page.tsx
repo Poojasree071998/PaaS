@@ -158,14 +158,30 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {status === 'READY' && (
-          <a 
-            href={deployment?.url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="group flex items-center gap-3 bg-white text-black px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
-          >
-            Open Live Site <ExternalLink className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-          </a>
+          <div className="flex flex-wrap gap-4">
+            <a 
+              href={deployment?.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group flex items-center gap-3 bg-white text-black px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
+            >
+              Open Live Site <ExternalLink className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+            </a>
+            
+            <button
+              onClick={async () => {
+                const apiUrl = getApiUrl();
+                const res = await fetch(`${apiUrl}/api/deployments/${id}/promote`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                  alert('Successfully promoted to production!');
+                }
+              }}
+              className="flex items-center gap-3 bg-zinc-900 text-white border border-white/10 px-8 py-3 rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
+            >
+              Promote to Production <ArrowUpRight className="w-4 h-4" />
+            </button>
+          </div>
         )}
       </div>
 
