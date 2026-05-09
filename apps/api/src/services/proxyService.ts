@@ -10,8 +10,8 @@ const proxy = httpProxy.createProxyServer({
 // Error handling for the proxy
 proxy.on('error', (err, req, res) => {
   logger.error('Proxy Error:', err);
-  if (res instanceof Response) {
-    res.status(502).json({ error: 'Deployment not responding' });
+  if (res && 'status' in res && typeof res.status === 'function') {
+    (res as any).status(502).json({ error: 'Deployment not responding' });
   }
 });
 
@@ -26,13 +26,17 @@ export class ProxyService {
         where: { 
           OR: [
             { slug: slug },
-            { customDomain: slug }
+            { 
+              domains: {
+                some: { hostname: slug }
+              }
+            }
           ]
         },
         include: { 
           productionDeployment: true 
         }
-      });
+      }) as any;
 
       if (!project || !project.productionDeployment) {
         return res.status(404).send('<h1>404: Project not found or not deployed yet</h1>');
@@ -43,7 +47,7 @@ export class ProxyService {
       // 2. Check if the deployment is actually running
       // Note: In a production environment, we'd check if the process is alive.
       // For now, we assume it's running on its assigned port.
-      const targetPort = (deployment as any).port || 5000;
+      const targetPort = deployment.port || 5000;
       const target = `http://localhost:${targetPort}`;
 
       logger.info(`Proxying request for ${slug} to ${target}`);
