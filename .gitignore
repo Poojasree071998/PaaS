@@ -8,3 +8,4 @@ build
 temp-builds
 *.log
 .DS_Store
+npm-cache

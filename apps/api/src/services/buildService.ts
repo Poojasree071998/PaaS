@@ -170,34 +170,61 @@ export class BuildService {
 
       // Inject local bin to PATH so 'vite', 'next', etc are found
       const localBin = path.join(workingDir, 'node_modules', '.bin');
+      const globalCachePath = path.join(process.cwd(), 'npm-cache');
+      
       env.PATH = `${localBin}${path.delimiter}${process.env.PATH}`;
+      env.npm_config_cache = globalCachePath;
 
       // --- LIGHTNING-FAST INSTALL ENGINE ---
       const hashFile = path.join(workingDir, '.last-install-hash');
       const modulesPath = path.join(workingDir, 'node_modules');
+      const lockPath = path.join(workingDir, 'package-lock.json');
+
+      if (!fs.existsSync(env.npm_config_cache)) {
+        await fsPromises.mkdir(env.npm_config_cache, { recursive: true });
+      }
       
       let shouldInstall = true;
       // Rigorous check: Hash must match AND node_modules must exist AND not be empty
       if (fs.existsSync(pkgPath) && fs.existsSync(modulesPath)) {
-        const currentHash = require('crypto').createHash('md5').update(fs.readFileSync(pkgPath)).digest('hex');
+        const pkgContent = fs.readFileSync(pkgPath);
+        const lockContent = fs.existsSync(lockPath) ? fs.readFileSync(lockPath) : '';
+        const currentHash = require('crypto').createHash('md5')
+          .update(pkgContent)
+          .update(lockContent)
+          .digest('hex');
+          
         const lastHash = fs.existsSync(hashFile) ? fs.readFileSync(hashFile, 'utf8') : '';
-        const modulesExist = fs.readdirSync(modulesPath).length > 5; // Basic check for meaningful content
+        const modulesExist = fs.readdirSync(modulesPath).length > 5;
         
         if (currentHash === lastHash && modulesExist) {
           await this.log(deploymentId, `⚡ Fast-Track: dependencies verified. Skipping install phase!`, LogLevel.INFO);
           shouldInstall = false;
         } else {
-          await this.log(deploymentId, `📦 Cache stale or incomplete. Preparing fresh install...`, LogLevel.INFO);
+          await this.log(deploymentId, `📦 Cache stale or incomplete. Preparing synchronization...`, LogLevel.INFO);
           fs.writeFileSync(hashFile, currentHash);
         }
       }
 
       if (shouldInstall) {
-        await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies (First build may take 2-3 minutes)...`, LogLevel.INFO);
+        const hasLock = fs.existsSync(lockPath);
+        const installCmd = hasLock ? 'ci' : 'install';
+        
+        await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies using ${hasLock ? 'npm ci' : 'npm install'}...`, LogLevel.INFO);
+        
+        const npmArgs = [
+          installCmd,
+          '--include=dev',
+          '--prefer-offline',
+          '--no-audit',
+          '--no-fund',
+          '--loglevel', 'error'
+        ];
+
         await this.executeLiveCommand(
           deploymentId, 
           'npm', 
-          ['install', '--include=dev', '--prefer-offline', '--no-audit', '--no-fund', '--loglevel', 'info'], 
+          npmArgs, 
           workingDir, 
           env, 
           1200000
@@ -219,8 +246,8 @@ export class BuildService {
       if (buildCommand && buildCommand !== 'SKIP') {
         const buildParts = buildCommand.split('&&').map(c => c.trim());
         for (const part of buildParts) {
-          // If the user included npm install in their command, skip it if we already did it
-          if (part.startsWith('npm install') && !shouldInstall) {
+          // If the user included npm install/ci in their command, skip it if we already did it
+          if ((part.startsWith('npm install') || part.startsWith('npm ci')) && !shouldInstall) {
             await this.log(deploymentId, `⚡ Skipping redundant '${part}' as dependencies are already synced.`, LogLevel.INFO);
             continue;
           }
