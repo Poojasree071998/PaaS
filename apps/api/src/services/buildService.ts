@@ -246,10 +246,20 @@ export class BuildService {
       if (buildCommand && buildCommand !== 'SKIP') {
         const buildParts = buildCommand.split('&&').map(c => c.trim());
         for (const part of buildParts) {
-          // If the user included npm install/ci in their command, skip it if we already did it
+          // 1. Skip redundant install/ci commands
           if ((part.startsWith('npm install') || part.startsWith('npm ci')) && !shouldInstall) {
             await this.log(deploymentId, `⚡ Skipping redundant '${part}' as dependencies are already synced.`, LogLevel.INFO);
             continue;
+          }
+          
+          // 2. Smart Script Check: Skip if npm run script is missing in package.json
+          if (part.startsWith('npm run ') && fs.existsSync(pkgPath)) {
+            const scriptName = part.replace('npm run ', '').split(' ')[0];
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            if (!pkg.scripts?.[scriptName]) {
+              await this.log(deploymentId, `ℹ️ Optional script '${scriptName}' not found. Skipping build step...`, LogLevel.INFO);
+              continue;
+            }
           }
           
           await this.log(deploymentId, `🏃 Running: ${part}`, LogLevel.INFO);
