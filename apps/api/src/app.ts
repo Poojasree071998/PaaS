@@ -60,31 +60,26 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+import { ProxyService } from './services/proxyService';
+
 // --- PERMANENT PRODUCTION ROUTER ---
+// Routes traffic based on the project slug (e.g. /p/my-app)
 app.get('/p/:slug/:subPath(*)?', async (req, res) => {
   const { slug } = req.params;
-  const subPath = (req.params as any).subPath || '';
+  return ProxyService.handleRequest(req, res, slug);
+});
 
-  try {
-    const project = await prisma.project.findFirst({
-      where: { slug },
-      include: { productionDeployment: true }
-    });
+// --- SUBDOMAIN ROUTER ---
+// Routes traffic based on the hostname (e.g. my-app.deployflow.dev)
+app.use(async (req, res, next) => {
+  const host = req.headers.host || '';
+  const baseDomain = 'deployflow.dev'; // Should match your APP_SUBDOMAIN_BASE in .env
 
-    if (!project || !project.productionDeploymentId) {
-      return res.status(404).send('<h1>Project not found or no production deployment set</h1>');
-    }
-
-    // Ensure the production deployment is running
-    await BuildService.ensureRunning(project.productionDeploymentId);
-
-    // Redirect internal request to the live deployment handler
-    req.params.id = project.productionDeploymentId;
-    return (app as any)._router.handle(req, res, () => {});
-  } catch (error) {
-    logger.error('Production Routing error:', error);
-    res.status(500).send('Internal Server Error during production routing.');
+  if (host.endsWith(baseDomain) && host !== baseDomain) {
+    const slug = host.replace(`.${baseDomain}`, '');
+    return ProxyService.handleRequest(req, res, slug);
   }
+  next();
 });
 
 // --- PROJECT-AWARE LIVE HOSTING ENGINE ---
