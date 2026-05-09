@@ -207,7 +207,8 @@ export class BuildService {
       }
 
       if (shouldInstall) {
-        const pkg = JSON.parse(pkgContent.toString());
+        const pkgData = fs.readFileSync(pkgPath);
+        const pkg = JSON.parse(pkgData.toString());
         const isMonorepo = !!pkg.workspaces;
         const hasLock = fs.existsSync(lockPath);
         
