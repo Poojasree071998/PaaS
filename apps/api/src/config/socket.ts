@@ -6,11 +6,20 @@ let io: Server;
 export const initSocket = (server: HttpServer) => {
   io = new Server(server, {
     cors: {
-      origin: [
-        "https://deployflow-web.onrender.com", 
-        "http://localhost:3000",
-        "http://localhost:5173"
-      ],
+      origin: (origin, callback) => {
+        const allowedOrigins = [
+          "https://deployflow-web.onrender.com", 
+          "https://bejewelled-griffin-055a6f.netlify.app",
+          "http://localhost:3000",
+          "http://localhost:5173"
+        ];
+        
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.netlify.app')) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       methods: ["GET", "POST"],
       credentials: true
     },

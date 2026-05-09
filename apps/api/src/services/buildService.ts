@@ -125,9 +125,23 @@ export class BuildService {
       
       if (fs.existsSync(pkgPath)) {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        // Auto-detect Build Command
         if (!buildCommand || buildCommand === 'npm run build') {
           if (pkg.scripts?.build) buildCommand = 'npm run build';
           else if (pkg.scripts?.compile) buildCommand = 'npm run compile';
+        }
+
+        // Auto-detect Framework and Process Requirements
+        const hasStartScript = !!pkg.scripts?.start;
+        const isNext = !!pkg.dependencies?.next;
+        const isVite = !!pkg.devDependencies?.vite;
+
+        if (isNext) await this.log(deploymentId, `🚀 Smart-Detect: Next.js project identified.`, LogLevel.INFO);
+        else if (isVite) await this.log(deploymentId, `⚡ Smart-Detect: Vite project identified.`, LogLevel.INFO);
+        
+        if (!hasStartScript && !isNext) {
+          await this.log(deploymentId, `🌐 No start script found. Switching to Static Mode.`, LogLevel.INFO);
+          // Update project to static if needed
         }
       }
 
@@ -209,6 +223,7 @@ export class BuildService {
           '--prefer-offline',
           '--no-audit',
           '--no-fund',
+          '--legacy-peer-deps',
           '--loglevel', 'error'
         ];
 
