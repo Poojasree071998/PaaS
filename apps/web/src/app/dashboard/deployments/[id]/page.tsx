@@ -100,8 +100,15 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
       });
     });
 
-    socket.on('deployment:status', (newStatus: string) => {
+    socket.on('deployment:status', async (newStatus: string) => {
       setStatus(newStatus);
+      // If build finished, re-fetch to get the final URL and metadata
+      if (newStatus === 'READY' || newStatus === 'ERROR') {
+        const apiUrl = getApiUrl();
+        const res = await fetch(`${apiUrl}/api/deployments/${id}`);
+        const data = await res.json();
+        if (data.success) setDeployment(data.data);
+      }
     });
 
     return () => {

@@ -475,6 +475,12 @@ export class BuildService {
           content = content.replace(/(postgresql:\/\/)?127\.0\.0\.1:5432[^\s'"`]*/g, pgUrl);
         }
 
+        // Smart Port Patching: help apps listen on the dynamic port
+        const originalBeforePort = content;
+        content = content.replace(/listen\(3000\)/g, 'listen(process.env.PORT || 3000)');
+        content = content.replace(/port\s*=\s*3000/g, `port = process.env.PORT || 3000`);
+        content = content.replace(/:3000/g, `:${env.PORT || 3000}`); // Replace internal 3000 references
+
         if (content !== originalContent) {
           await fsPromises.writeFile(fullPath, content);
           patchedCount++;
