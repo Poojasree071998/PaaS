@@ -27,6 +27,17 @@ import notificationRoutes from './routes/notificationRoutes';
 import adminRoutes from './routes/adminRoutes';
 
 const app = express();
+app.set('trust proxy', 1);
+
+// Health Check
+app.get('/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'OK', message: 'DeployFlow API is healthy', database: 'connected' });
+  } catch (err) {
+    res.status(500).json({ status: 'ERROR', message: 'Database disconnected' });
+  }
+});
 
 // Security Middlewares
 app.set('strict routing', false);
