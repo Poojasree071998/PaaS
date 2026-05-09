@@ -333,12 +333,22 @@ export class BuildService {
         child.stdout.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.INFO));
         child.stderr.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.WARN));
 
+        // --- HEALTH CHECK ENGINE ---
+        await this.log(deploymentId, `🔍 Performing health check on port ${port}...`, LogLevel.INFO);
+        const healthy = await this.pollHealth(port, 60); // Wait up to 60s
+        
+        if (!healthy) {
+          child.kill('SIGKILL');
+          runningProcesses.delete(deploymentId);
+          throw new Error(`Health check failed: Application did not respond on port ${port} within 60s. Ensure your app listens on process.env.PORT.`);
+        }
+
         await prisma.deployment.update({
           where: { id: deploymentId },
           data: { meta: { port } }
         });
 
-        await this.log(deploymentId, `🟢 Backend running on port ${port}`, LogLevel.INFO);
+        await this.log(deploymentId, `🟢 SUCCESS: Application is healthy and live on port ${port}`, LogLevel.INFO);
       }
 
       await this.log(deploymentId, `✨ SUCCESS! Live at: ${projectUrl}`, LogLevel.INFO);
@@ -519,5 +529,31 @@ export class BuildService {
 
   static getActiveProcessCount(): number {
     return runningProcesses.size;
+  }
+
+  private static async pollHealth(port: number, timeoutSeconds: number): Promise<boolean> {
+    const start = Date.now();
+    const http = require('http');
+
+    return new Promise((resolve) => {
+      const check = () => {
+        if (Date.now() - start > timeoutSeconds * 1000) {
+          return resolve(false);
+        }
+
+        const req = http.get(`http://localhost:${port}`, (res: any) => {
+          // Any response (even 404) means the server is listening
+          resolve(true);
+        });
+
+        req.on('error', () => {
+          setTimeout(check, 2000); // Try again in 2s
+        });
+
+        req.end();
+      };
+
+      check();
+    });
   }
 }
