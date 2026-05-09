@@ -78,7 +78,7 @@ export class BuildService {
     }
 
     buildingDeployments.add(deploymentId);
-    const buildDir = path.join(process.cwd(), 'temp-builds', deployment.projectId);
+    const buildDir = path.resolve(process.cwd(), 'temp-builds', deployment.projectId);
     
     try {
       await prisma.deployment.update({
@@ -103,81 +103,59 @@ export class BuildService {
       } else {
         await this.log(deploymentId, `📦 Cloning repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
         try {
-          // Attempt 1: Try the specified branch
           await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
         } catch (err) {
           await this.log(deploymentId, `⚠️ Branch '${deployment.branch}' not found. Checking default branch...`, LogLevel.WARN);
-          
-          // Cleanup
           const files = await fsPromises.readdir(buildDir);
           for (const file of files) {
             await fsPromises.rm(path.join(buildDir, file), { recursive: true, force: true }).catch(() => {});
           }
-
-          // Attempt 2: Just clone and let Git pick the default branch
           await this.log(deploymentId, `🔄 Falling back to default branch (master/main)...`, LogLevel.INFO);
           await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
         }
         await this.log(deploymentId, `✅ Repository successfully cloned.`, LogLevel.INFO);
       }
 
-      // --- ENVIRONMENT GATHERING ---
       const projectDatabases = await prisma.managedDatabase.findMany({
         where: { projectId: deployment.projectId }
       });
 
-      if (projectDatabases.length === 0) {
-        await this.log(deploymentId, `⚠️ No databases linked to this project. Please link a database in the 'Databases' tab to enable automatic cloud connection.`, LogLevel.WARN);
-      }
-
-      // --- INTELLIGENT AUTO-CONFIG ---
       const pkgPath = path.join(buildDir, 'package.json');
       let buildCommand = deployment.project.buildCommand;
       
       if (fs.existsSync(pkgPath)) {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        
-        // Auto-detect Build Command
         if (!buildCommand || buildCommand === 'npm run build') {
           if (pkg.scripts?.build) buildCommand = 'npm run build';
           else if (pkg.scripts?.compile) buildCommand = 'npm run compile';
-          else await this.log(deploymentId, `ℹ️ No build script found. Skipping build step.`, LogLevel.INFO);
         }
-
-        // Auto-detect Framework for UI
-        if (pkg.dependencies?.next) await this.log(deploymentId, `🚀 Smart-Detect: Next.js project identified.`, LogLevel.INFO);
-        else if (pkg.devDependencies?.vite) await this.log(deploymentId, `⚡ Smart-Detect: Vite project identified.`, LogLevel.INFO);
       }
 
       const env: Record<string, string> = {
-        NODE_ENV: 'development', // Must be development during build to install devDependencies (Vite, etc)
+        NODE_ENV: 'development',
         PORT: '3000',
         ...Object.fromEntries(deployment.project.envVars.map((v: any) => [v.key, v.value])),
       };
 
-      // Auto-inject database credentials
       projectDatabases.forEach(db => {
         const dbType = db.type as string;
         if (dbType === 'POSTGRES') env.DATABASE_URL = db.connectionString;
         if (dbType === 'REDIS') env.REDIS_URL = db.connectionString;
         if (dbType === 'MONGODB') env.MONGODB_URI = db.connectionString;
-        // Also inject as generic names for compatibility
-        env[`DB_${db.name.toUpperCase()}_URL`] = db.connectionString;
       });
-
-      await this.log(deploymentId, `✅ Environment initialized with ${projectDatabases.length} database(s).`, LogLevel.INFO);
 
       let workingDir = buildDir;
       if (deployment.project.rootDirectory && deployment.project.rootDirectory !== './') {
-        workingDir = path.join(buildDir, deployment.project.rootDirectory.replace(/^\.\//, ''));
+        workingDir = path.resolve(buildDir, deployment.project.rootDirectory.replace(/^\.\//, ''));
       }
 
-      // Inject local bin to PATH so 'vite', 'next', etc are found
       const localBin = path.join(workingDir, 'node_modules', '.bin');
       const globalCachePath = path.join(process.cwd(), 'npm-cache');
       
+      // Ensure the build never leaks out of the temp folder
       env.PATH = `${localBin}${path.delimiter}${process.env.PATH}`;
       env.npm_config_cache = globalCachePath;
+      env.HOME = workingDir; // Force Git to look for config only in the temp folder
 
       // --- LIGHTNING-FAST INSTALL ENGINE ---
       const hashFile = path.join(workingDir, '.last-install-hash');
