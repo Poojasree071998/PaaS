@@ -120,6 +120,7 @@ model User {
   teams            TeamMember[]
   projects         Project[]
   deployments      Deployment[]
+  databases        ManagedDatabase[]
   apiTokens        ApiToken[]
   auditLogs        AuditLog[]
   notifications    Notification[]
@@ -355,6 +356,7 @@ model AuditLog {
 model ManagedDatabase {
   id               String         @id @default(cuid())
   teamId           String
+  userId           String         // Added to support personal databases
   projectId        String?
   name             String
   type             DatabaseType
@@ -369,6 +371,7 @@ model ManagedDatabase {
   storageGB        Int            @default(1)
   
   team             Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id])
   project          Project?       @relation(fields: [projectId], references: [id])
   
   createdAt        DateTime       @default(now())

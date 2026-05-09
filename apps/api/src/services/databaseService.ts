@@ -52,9 +52,10 @@ export class DatabaseService {
       connectionString = `postgresql://${username}:${password}@${host}/${dbName}`;
     }
 
-    return prisma.managedDatabase.create({
+    return (prisma.managedDatabase as any).create({
       data: {
         ...data,
+        userId, // Link to the user who created it
         status: DatabaseStatus.ACTIVE,
         host,
         port,
@@ -82,7 +83,7 @@ export class DatabaseService {
     }
 
     // Default: Show all databases created by this user
-    return prisma.managedDatabase.findMany({
+    return (prisma.managedDatabase as any).findMany({
       where: { userId },
       include: { project: { select: { name: true } } }
     });
