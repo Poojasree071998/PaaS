@@ -18,7 +18,8 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "db:generate": "npx prisma generate --schema ./packages/db/prisma/schema.prisma",
-    "db:push": "npx prisma db push --schema ./packages/db/prisma/schema.prisma --accept-data-loss"
+    "db:push": "npx prisma db push --schema ./packages/db/prisma/schema.prisma --accept-data-loss",
+    "seed": "npm run prisma:seed --workspace=api"
   },
   "devDependencies": {
     "@prisma/client": "^5.12.1",

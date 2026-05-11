@@ -44,6 +44,13 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
     // 3. Find or create a project
     let project = await prisma.project.findFirst({ where: { repoUrl } });
     if (!project) {
+      // Auto-Detect Framework before creation
+      let detectedFramework: Framework = Framework.STATIC;
+      try {
+        const analysis = await AnalysisService.analyzeRepository(repoUrl);
+        if (analysis.framework) detectedFramework = analysis.framework as Framework;
+      } catch (e) {}
+
       const name = repoUrl.split('/').pop() || 'new-project';
       project = await prisma.project.create({
         data: {
@@ -52,7 +59,7 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
           repoUrl,
           repoProvider: RepoProvider.GITHUB,
           repoId: 'manual',
-          framework: Framework.NEXTJS,
+          framework: detectedFramework,
           teamId: team.id,
           userId,
           buildCommand: buildCommand || 'npm run build',

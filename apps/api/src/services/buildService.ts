@@ -108,19 +108,46 @@ export class BuildService {
         await this.executeLiveCommand(deploymentId, 'git', ['reset', '--hard', `origin/${deployment.branch}`], buildDir, gitEnv, 30000);
         await this.log(deploymentId, `✅ Project updated via incremental pull.`, LogLevel.INFO);
       } else {
-        await this.log(deploymentId, `📦 Cloning repository: ${deployment.project.repoUrl}`, LogLevel.INFO);
-        try {
-          await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
-        } catch (err) {
+        let repoUrl = deployment.project.repoUrl.trim().replace(/\/+$/, '');
+        const urlVariations = [repoUrl];
+        
+        // Smart-Recover: Generate common variations for typos (e.g. schoolproject -> school-project)
+        if (repoUrl.includes('github.com')) {
+          const parts = repoUrl.split('/');
+          const repoName = parts.pop() || '';
+          const baseUrl = parts.join('/');
+          
+          if (repoName.includes('-')) urlVariations.push(`${baseUrl}/${repoName.replace(/-/g, '')}`);
+          else {
+            urlVariations.push(`${baseUrl}/${repoName.replace(/project/i, '-project')}`);
+          }
+        }
+
+        let success = false;
+        for (const url of urlVariations) {
+          try {
+            await this.log(deploymentId, success ? `🔄 Retrying with variation: ${url}` : `📦 Cloning repository: ${url}`, LogLevel.INFO);
+            await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', '-b', deployment.branch, url, '.'], buildDir, gitEnv, 120000);
+            repoUrl = url; // Update to the successful one
+            success = true;
+            break;
+          } catch (err) {
+            if (url === urlVariations[urlVariations.length - 1]) throw err; // Re-throw if last attempt
+            await this.log(deploymentId, `⚠️ Attempt failed. Searching for alternative matches...`, LogLevel.WARN);
+          }
+        }
+        
+        if (!success) {
+          // Fallback to default branch check (master/main)
           await this.log(deploymentId, `⚠️ Branch '${deployment.branch}' not found. Checking default branch...`, LogLevel.WARN);
           const files = await fsPromises.readdir(buildDir);
           for (const file of files) {
             await fsPromises.rm(path.join(buildDir, file), { recursive: true, force: true }).catch(() => {});
           }
           await this.log(deploymentId, `🔄 Falling back to default branch (master/main)...`, LogLevel.INFO);
-          await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', deployment.project.repoUrl, '.'], buildDir, gitEnv, 120000);
+          await this.executeLiveCommand(deploymentId, 'git', ['clone', '--depth', '1', repoUrl, '.'], buildDir, gitEnv, 120000);
         }
-        await this.log(deploymentId, `✅ Repository successfully cloned.`, LogLevel.INFO);
+        await this.log(deploymentId, `✅ Repository successfully cloned via Smart-Recover.`, LogLevel.INFO);
       }
 
       const projectDatabases = await prisma.managedDatabase.findMany({
@@ -149,16 +176,40 @@ export class BuildService {
         else if (pkg.main) startCommand = `node ${pkg.main}`;
         else if (fs.existsSync(path.join(buildDir, 'index.js'))) startCommand = 'node index.js';
         else if (fs.existsSync(path.join(buildDir, 'server.js'))) startCommand = 'node server.js';
+        else if (fs.existsSync(path.join(buildDir, 'backend', 'package.json'))) {
+          const backendPkg = JSON.parse(fs.readFileSync(path.join(buildDir, 'backend', 'package.json'), 'utf8'));
+          if (backendPkg.scripts?.start) startCommand = 'npm start --prefix backend';
+          else if (backendPkg.scripts?.dev) startCommand = 'npm run dev --prefix backend';
+          else if (fs.existsSync(path.join(buildDir, 'backend', 'index.js'))) startCommand = 'node backend/index.js';
+        }
 
-        // 3. Framework Identity Logging
+        // 3. Framework Identity Correction (Auto-Pilot)
         const isNext = !!pkg.dependencies?.next;
         const isVite = !!pkg.dependencies?.vite || !!pkg.devDependencies?.vite;
         const isReact = !!pkg.dependencies?.react;
+        const isExpress = !!pkg.dependencies?.express;
 
-        if (isNext) await this.log(deploymentId, `🚀 Smart-Detect: Next.js project identified.`, LogLevel.INFO);
-        else if (isVite) await this.log(deploymentId, `⚡ Smart-Detect: Vite project identified.`, LogLevel.INFO);
-        else if (isReact) await this.log(deploymentId, `⚛️ Smart-Detect: React project identified.`, LogLevel.INFO);
-        else await this.log(deploymentId, `📦 Smart-Detect: Node.js project identified.`, LogLevel.INFO);
+        let detectedFramework = deployment.project.framework;
+        if (isNext) {
+          await this.log(deploymentId, `🚀 Auto-Pilot: Next.js project identified.`, LogLevel.INFO);
+          detectedFramework = Framework.NEXTJS;
+        } else if (isVite) {
+          await this.log(deploymentId, `⚡ Auto-Pilot: Vite project identified.`, LogLevel.INFO);
+          detectedFramework = Framework.REACT;
+        } else if (isExpress) {
+          await this.log(deploymentId, `🚂 Auto-Pilot: Express project identified.`, LogLevel.INFO);
+          detectedFramework = Framework.EXPRESS;
+        } else if (isReact) {
+          await this.log(deploymentId, `⚛️ Auto-Pilot: React project identified.`, LogLevel.INFO);
+          detectedFramework = Framework.REACT;
+        }
+
+        if (detectedFramework !== deployment.project.framework) {
+          await prisma.project.update({
+            where: { id: deployment.projectId },
+            data: { framework: detectedFramework }
+          });
+        }
       }
 
       await this.log(deploymentId, `⚙️ Configuration: Build ["${buildCommand || 'none'}"], Start ["${startCommand}"]`, LogLevel.INFO);
@@ -272,15 +323,13 @@ export class BuildService {
         await this.log(deploymentId, `✅ Dependencies synchronized.`, LogLevel.INFO);
       }
 
-      // --- SMART SUBFOLDER DETECTOR (Always check subfolders) ---
-      // We run these sequentially to avoid Windows file locks
-      if (fs.existsSync(path.join(workingDir, 'backend', 'package.json'))) {
-        await this.log(deploymentId, `📦 Backend subfolder detected. Synchronizing backend dependencies...`, LogLevel.INFO);
-        await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefix', 'backend', '--no-audit', '--no-fund', '--no-bin-links'], workingDir, env, 600000);
-      }
-      if (fs.existsSync(path.join(workingDir, 'frontend', 'package.json'))) {
-        await this.log(deploymentId, `📦 Frontend subfolder detected. Synchronizing frontend dependencies...`, LogLevel.INFO);
-        await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefix', 'frontend', '--no-audit', '--no-fund', '--no-bin-links'], workingDir, env, 600000);
+      // --- SMART SUBFOLDER DETECTOR (True Auto-Pilot) ---
+      const commonSubfolders = ['backend', 'frontend', 'api', 'web', 'client', 'server'];
+      for (const folder of commonSubfolders) {
+        if (fs.existsSync(path.join(workingDir, folder, 'package.json'))) {
+          await this.log(deploymentId, `📦 Subfolder '${folder}' detected. Synchronizing dependencies...`, LogLevel.INFO);
+          await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefix', folder, '--no-audit', '--no-fund', '--no-bin-links'], workingDir, env, 600000);
+        }
       }
 
       // --- STEP 6: BUILD PROCESS ---
@@ -331,11 +380,9 @@ export class BuildService {
       const hasDist = fs.existsSync(path.join(workingDir, 'dist')) || fs.existsSync(path.join(workingDir, 'build'));
       
       if (hasDist) {
-        await this.log(deploymentId, `🌐 Static Frontend detected. Serving from /dist...`, LogLevel.INFO);
-        // In a real app, this would start an Nginx container. Here we use our internal static server.
+        await this.log(deploymentId, `🌐 Static Frontend detected. Serving from build folder...`, LogLevel.INFO);
       } else {
-        await this.log(deploymentId, `🔌 Backend service detected. Starting with 'npm start'...`, LogLevel.INFO);
-        this.executeLiveCommand(deploymentId, 'npm', ['start'], workingDir, env).catch(() => {});
+        await this.log(deploymentId, `🔌 Backend service detected. Preparing for startup...`, LogLevel.INFO);
       }
 
       // --- SUCCESS ---
@@ -343,7 +390,7 @@ export class BuildService {
         ? 'http://localhost:4000' 
         : (process.env.APP_DOMAIN ? `https://${process.env.APP_DOMAIN}` : 'https://deployflow-api.onrender.com');
       
-      const projectUrl = `${apiUrl}/live/${deploymentId}`;
+      const projectUrl = `${apiUrl}/live/${deploymentId}/`;
 
       await prisma.deployment.update({
         where: { id: deploymentId },
@@ -366,7 +413,7 @@ export class BuildService {
         }
 
         await this.log(deploymentId, `🚀 Starting Backend Process...`, LogLevel.INFO);
-        await this.executeBackendProcess(deploymentId, deployment, workingDir, env);
+        await this.executeBackendProcess(deploymentId, deployment, workingDir, env, startCommand);
       }
 
       await this.log(deploymentId, `✨ SUCCESS! Live at: ${projectUrl}`, LogLevel.INFO);
@@ -393,6 +440,9 @@ export class BuildService {
   }
 
   private static translateError(error: string): string {
+    if (error.includes('128') || error.includes('not found') || error.includes('Repository not found')) {
+      return 'Repository not found or is private. Please ensure the repository is public or check the URL for typos.';
+    }
     if (error.includes('MONGODB_URI') || error.includes('mongoose')) {
       return 'MongoDB URL is missing or incorrect. Please add your MONGODB_URI to environment variables.';
     }
@@ -497,6 +547,15 @@ export class BuildService {
           if (mongoUrl) {
             content = content.replace(/(mongodb:\/\/)?localhost:27017[^\s'"`]*/g, mongoUrl);
             content = content.replace(/(mongodb:\/\/)?127\.0\.0\.1:27017[^\s'"`]*/g, mongoUrl);
+            // Patch mongoose.connect if it's using an undefined variable (Universal Recovery)
+            content = content.replace(/mongoose\.connect\(([^)]+)\)/g, (match, p1) => {
+              const trimmed = p1.trim();
+              // If it looks like a variable (not a string literal), inject the fallback
+              if (!trimmed.match(/^['"`]/)) {
+                return `mongoose.connect(${trimmed} || "${mongoUrl}")`;
+              }
+              return match;
+            });
           }
           if (pgUrl) {
             content = content.replace(/(postgresql:\/\/)?localhost:5432[^\s'"`]*/g, pgUrl);
@@ -530,36 +589,56 @@ export class BuildService {
               content.includes('express()') && 
               !content.includes('PAAS AUTO-UNIFY')) {
             
-            const fullStackServingCode = `
+            const getServingCode = (appVar: string, depId: string) => `
 // --- PAAS AUTO-UNIFY: Serving frontend from backend ---
-const fsSync = require('fs');
-const pathSync = require('path');
-const possiblePaths = [
-    pathSync.join(__dirname, '../frontend/dist'),
-    pathSync.join(__dirname, './frontend/dist'),
-    pathSync.join(__dirname, '../dist'),
-    pathSync.join(__dirname, './dist')
+const _fs = require('fs');
+const _path = require('path');
+const _possiblePaths = [
+    _path.join(__dirname, '../frontend/dist'),
+    _path.join(__dirname, './frontend/dist'),
+    _path.join(__dirname, '../client/dist'),
+    _path.join(__dirname, './client/dist'),
+    _path.join(__dirname, '../web/dist'),
+    _path.join(__dirname, './web/dist'),
+    _path.join(__dirname, '../dist'),
+    _path.join(__dirname, './dist'),
+    _path.join(__dirname, '../build'),
+    _path.join(__dirname, './build')
 ];
-const frontendBuildPath = possiblePaths.find(p => fsSync.existsSync(p));
+const _frontendPath = _possiblePaths.find(p => _fs.existsSync(p));
 
-if (frontendBuildPath) {
-    console.log('✅ PaaS: Serving frontend from', frontendBuildPath);
-    app.use(express.static(frontendBuildPath));
-    app.get(/^\\/(?!api).*/, (req, res) => {
-        res.sendFile(pathSync.join(frontendBuildPath, 'index.html'));
+if (_frontendPath) {
+    console.log('✅ PaaS: Serving frontend from', _frontendPath);
+    ${appVar}.use(require('express').static(_frontendPath));
+    ${appVar}.get(/^\\/(?!api).*/, (req, res) => {
+        const _indexPath = _path.join(_frontendPath, 'index.html');
+        if (_fs.existsSync(_indexPath)) {
+            let _html = _fs.readFileSync(_indexPath, 'utf8');
+            if (!_html.includes('<base href')) {
+                const _base = '<base href="/live/${depId}/">';
+                if (_html.includes('<head>')) _html = _html.replace('<head>', '<head>\\n    ' + _base);
+                else if (_html.includes('<html>')) _html = _html.replace('<html>', '<html>\\n<head>' + _base + '</head>');
+                else _html = _base + _html;
+            }
+            res.setHeader('Content-Type', 'text/html');
+            res.send(_html);
+        } else {
+            res.sendFile(_indexPath);
+        }
     });
 }
 `;
-            // Inject auto-unify logic immediately after the express() initialization to ensure it takes precedence over other routes
+            // Inject auto-unify logic immediately after the express() initialization
             const expressInitRegex = /(\w+)\s*=\s*express\(\)/;
-            if (content.match(expressInitRegex)) {
-              content = content.replace(expressInitRegex, (match, appVar) => {
-                return `${match};\n\n// --- PAAS AUTO-UNIFY: Setup ---\nconst express = require('express');\nconst app = ${appVar};\n${fullStackServingCode}`;
-              });
+            const match = content.match(expressInitRegex);
+            
+            if (match) {
+              const appVar = match[1];
+              content = content.replace(expressInitRegex, `${match[0]};\n${getServingCode(appVar, deploymentId)}`);
             } else if (content.includes('app.listen')) {
-              content = content.replace(/^.*app\.listen/m, (match) => `${fullStackServingCode}\n${match}`);
+              content = content.replace(/^.*app\.listen/m, (match) => `${getServingCode('app', deploymentId)}\n${match}`);
             } else {
-              content += `\n${fullStackServingCode}`;
+              content += `\n${getServingCode('app', deploymentId)}`;
             }
           }
 
@@ -591,6 +670,12 @@ if (frontendBuildPath) {
     });
 
     if (!deployment || deployment.status !== DeploymentStatus.READY) return false;
+    
+    // Skip wakeup for purely static frameworks
+    const backendFrameworks: string[] = [Framework.EXPRESS, Framework.FASTAPI, Framework.DJANGO, Framework.RAILS, Framework.LARAVEL, Framework.NEXTJS];
+    if (!backendFrameworks.includes(deployment.project.framework as string)) {
+      return true;
+    }
 
     const buildDir = path.join(process.cwd(), 'temp-builds', deployment.projectId);
     let workingDir = buildDir;
@@ -635,12 +720,30 @@ if (frontendBuildPath) {
     return true;
   }
 
-  private static async executeBackendProcess(deploymentId: string, deployment: any, workingDir: string, env: any) {
+  private static async executeBackendProcess(deploymentId: string, deployment: any, workingDir: string, env: any, overrideStart?: string) {
     const backendFrameworks: string[] = [Framework.EXPRESS, Framework.FASTAPI, Framework.DJANGO, Framework.RAILS, Framework.LARAVEL, Framework.NEXTJS];
     if (!backendFrameworks.includes(deployment.project.framework as string)) return;
 
     const port = Math.floor(Math.random() * 7000) + 3000;
-    const startCmd = deployment.project.startCommand || 'npm start';
+    let startCmd = overrideStart || (deployment.meta as any)?.detectedStart || deployment.project.startCommand || 'npm start';
+    
+    // Force Vite/Next dev servers to respect the assigned port
+    const isVite = fs.existsSync(path.join(workingDir, 'vite.config.ts')) || 
+                   fs.existsSync(path.join(workingDir, 'vite.config.js')) ||
+                   fs.existsSync(path.join(workingDir, 'backend', 'vite.config.ts')) ||
+                   fs.existsSync(path.join(workingDir, 'backend', 'vite.config.js'));
+    
+    const isNext = fs.existsSync(path.join(workingDir, 'next.config.js')) || 
+                   fs.existsSync(path.join(workingDir, 'next.config.mjs'));
+
+    if (isVite && !startCmd.includes('--port')) {
+      if (startCmd.startsWith('npm ')) startCmd += ` -- --port ${port}`;
+      else startCmd += ` --port ${port}`;
+    } else if (isNext && !startCmd.includes('--port')) {
+      if (startCmd.startsWith('npm ')) startCmd += ` -- --port ${port}`;
+      else startCmd += ` --port ${port}`;
+    }
+
     const [cmd, ...args] = startCmd.split(' ');
 
     const child = spawn(cmd, args, {

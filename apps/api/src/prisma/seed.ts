@@ -152,6 +152,7 @@ async function main() {
           { deploymentId: deployment.id, level: LogLevel.INFO, message: 'Running build command...', timestamp: new Date() },
           { deploymentId: deployment.id, level: statuses[i] === DeploymentStatus.ERROR ? LogLevel.ERROR : LogLevel.INFO, message: statuses[i] === DeploymentStatus.ERROR ? 'Build failed: Process exited with code 1' : 'Build successful!', timestamp: new Date() },
         ],
+        skipDuplicates: true,
       });
     }
 
@@ -161,51 +162,63 @@ async function main() {
         { projectId: project.id, teamId: team.id, key: 'DATABASE_URL', value: 'encrypted-url', environment: 'ALL', isSecret: true },
         { projectId: project.id, teamId: team.id, key: 'API_KEY', value: 'encrypted-key', environment: 'PRODUCTION', isSecret: true },
       ],
+      skipDuplicates: true,
     });
   }
 
   // 8. Custom Domains
   const nextjsProject = await prisma.project.findFirst({ where: { slug: 'my-nextjs-app' } });
   if (nextjsProject) {
-    await prisma.domain.create({
-      data: {
-        projectId: nextjsProject.id,
-        teamId: team.id,
-        hostname: 'www.my-nextjs-app.com',
-        verified: true,
-        verificationToken: 'token-123',
-        sslStatus: 'ACTIVE',
-      },
-    });
-    await prisma.domain.create({
-      data: {
-        projectId: nextjsProject.id,
-        teamId: team.id,
-        hostname: 'staging.my-nextjs-app.com',
-        verified: false,
-        verificationToken: 'token-456',
-        sslStatus: 'PENDING',
-      },
-    });
+    const existingDomain1 = await prisma.domain.findFirst({ where: { hostname: 'www.my-nextjs-app.com' } });
+    if (!existingDomain1) {
+      await prisma.domain.create({
+        data: {
+          projectId: nextjsProject.id,
+          teamId: team.id,
+          hostname: 'www.my-nextjs-app.com',
+          verified: true,
+          verificationToken: 'token-123',
+          sslStatus: 'ACTIVE',
+        },
+      });
+    }
+
+    const existingDomain2 = await prisma.domain.findFirst({ where: { hostname: 'staging.my-nextjs-app.com' } });
+    if (!existingDomain2) {
+      await prisma.domain.create({
+        data: {
+          projectId: nextjsProject.id,
+          teamId: team.id,
+          hostname: 'staging.my-nextjs-app.com',
+          verified: false,
+          verificationToken: 'token-456',
+          sslStatus: 'PENDING',
+        },
+      });
+    }
   }
 
   // 9. Managed Database
-  await prisma.managedDatabase.create({
-    data: {
-      teamId: team.id,
-      name: 'production-db',
-      type: DatabaseType.POSTGRES,
-      status: DatabaseStatus.ACTIVE,
-      host: 'localhost',
-      port: 5432,
-      dbName: 'prod_db',
-      username: 'admin',
-      password: 'encrypted-password',
-      connectionString: 'encrypted-connection-string',
-      version: '15.2',
-      storageGB: 10,
-    },
-  });
+  const existingDB = await prisma.managedDatabase.findFirst({ where: { teamId: team.id, name: 'production-db' } });
+  if (!existingDB) {
+    await prisma.managedDatabase.create({
+      data: {
+        teamId: team.id,
+        userId: admin.id,
+        name: 'production-db',
+        type: DatabaseType.POSTGRES,
+        status: DatabaseStatus.ACTIVE,
+        host: 'localhost',
+        port: 5432,
+        dbName: 'prod_db',
+        username: 'admin',
+        password: 'encrypted-password',
+        connectionString: 'encrypted-connection-string',
+        version: '15.2',
+        storageGB: 10,
+      },
+    });
+  }
 
   console.log('Seeding completed successfully!');
 }
