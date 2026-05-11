@@ -122,28 +122,51 @@ export class BuildService {
 
       const pkgPath = path.join(buildDir, 'package.json');
       let buildCommand = deployment.project.buildCommand;
+      let startCommand = 'npm start';
       
       if (fs.existsSync(pkgPath)) {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        // Auto-detect Build Command
-        if (!buildCommand || buildCommand === 'npm run build') {
-          if (pkg.scripts?.build) buildCommand = 'npm run build';
-          else if (pkg.scripts?.compile) buildCommand = 'npm run compile';
+        const scripts = pkg.scripts || {};
+        
+        // 1. Auto-detect Build Command
+        if (!buildCommand || buildCommand === 'npm run build' || buildCommand === './') {
+          if (scripts.build) buildCommand = 'npm run build';
+          else if (scripts.compile) buildCommand = 'npm run compile';
+          else if (fs.existsSync(path.join(buildDir, 'next.config.js'))) buildCommand = 'npx next build';
+          else if (fs.existsSync(path.join(buildDir, 'vite.config.ts'))) buildCommand = 'npx vite build';
         }
 
-        // Auto-detect Framework and Process Requirements
-        const hasStartScript = !!pkg.scripts?.start;
+        // 2. Auto-detect Start Command
+        if (scripts.start) startCommand = 'npm start';
+        else if (scripts.dev) startCommand = 'npm run dev';
+        else if (pkg.main) startCommand = `node ${pkg.main}`;
+        else if (fs.existsSync(path.join(buildDir, 'index.js'))) startCommand = 'node index.js';
+        else if (fs.existsSync(path.join(buildDir, 'server.js'))) startCommand = 'node server.js';
+
+        // 3. Framework Identity Logging
         const isNext = !!pkg.dependencies?.next;
-        const isVite = !!pkg.devDependencies?.vite;
+        const isVite = !!pkg.dependencies?.vite || !!pkg.devDependencies?.vite;
+        const isReact = !!pkg.dependencies?.react;
 
         if (isNext) await this.log(deploymentId, `🚀 Smart-Detect: Next.js project identified.`, LogLevel.INFO);
         else if (isVite) await this.log(deploymentId, `⚡ Smart-Detect: Vite project identified.`, LogLevel.INFO);
-        
-        if (!hasStartScript && !isNext) {
-          await this.log(deploymentId, `🌐 No start script found. Switching to Static Mode.`, LogLevel.INFO);
-          // Update project to static if needed
-        }
+        else if (isReact) await this.log(deploymentId, `⚛️ Smart-Detect: React project identified.`, LogLevel.INFO);
+        else await this.log(deploymentId, `📦 Smart-Detect: Node.js project identified.`, LogLevel.INFO);
       }
+
+      await this.log(deploymentId, `⚙️ Configuration: Build ["${buildCommand || 'none'}"], Start ["${startCommand}"]`, LogLevel.INFO);
+
+      // Store detected commands in meta for the hosting engine to use
+      await prisma.deployment.update({
+        where: { id: deploymentId },
+        data: { 
+          meta: { 
+            ...(deployment.meta as any || {}), 
+            detectedBuild: buildCommand, 
+            detectedStart: startCommand 
+          } 
+        }
+      });
 
       const env: Record<string, string> = {
         NODE_ENV: 'development',

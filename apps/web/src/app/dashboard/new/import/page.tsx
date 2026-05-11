@@ -20,8 +20,26 @@ export default function ImportProjectPage() {
   const [rootDirectory, setRootDirectory] = useState('./');
   const [buildCommand, setBuildCommand] = useState('npm run build');
   const [loading, setLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [envVars, setEnvVars] = useState([{ key: '', value: '' }]);
   const router = useRouter();
+
+  const linkDatabase = async () => {
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/databases?teamId=default`);
+      const data = await res.json();
+      if (data.success && data.data.length > 0) {
+        const db = data.data[0];
+        const key = db.type === 'MONGODB' ? 'MONGODB_URI' : 'DATABASE_URL';
+        setEnvVars([{ key, value: db.connectionString }, ...envVars.filter(v => v.key !== key && v.key !== '')]);
+      } else {
+        alert('No managed databases found. Create one in the Databases tab first!');
+      }
+    } catch (e) {
+      alert('Failed to fetch databases.');
+    }
+  };
 
   const addEnvVar = () => {
     setEnvVars([...envVars, { key: '', value: '' }]);
@@ -109,61 +127,82 @@ export default function ImportProjectPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2 focus-within:border-white/20 transition-colors">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
-              <GitBranch className="w-3.5 h-3.5" />
-              Default Branch
+        {/* Advanced Settings Toggle */}
+        <div className="border-t border-white/5 pt-6">
+          <button 
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            <Settings className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+            {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+          </button>
+
+          {showAdvanced && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  <GitBranch className="w-3.5 h-3.5" />
+                  Branch
+                </div>
+                <input 
+                  type="text" 
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
+                />
+              </div>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  <Settings className="w-3.5 h-3.5" />
+                  Root Dir
+                </div>
+                <input 
+                  type="text" 
+                  value={rootDirectory}
+                  onChange={(e) => setRootDirectory(e.target.value)}
+                  className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
+                />
+              </div>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  <Zap className="w-3.5 h-3.5" />
+                  Build
+                </div>
+                <input 
+                  type="text" 
+                  value={buildCommand}
+                  onChange={(e) => setBuildCommand(e.target.value)}
+                  className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
+                />
+              </div>
             </div>
-            <input 
-              type="text" 
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
-              placeholder="main"
-            />
-          </div>
-          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2 focus-within:border-white/20 transition-colors">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
-              <Settings className="w-3.5 h-3.5" />
-              Root Directory
-            </div>
-            <input 
-              type="text" 
-              value={rootDirectory}
-              onChange={(e) => setRootDirectory(e.target.value)}
-              className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
-              placeholder="./"
-            />
-          </div>
-          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2 focus-within:border-white/20 transition-colors">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
-              <Zap className="w-3.5 h-3.5" />
-              Build Command
-            </div>
-            <input 
-              type="text" 
-              value={buildCommand}
-              onChange={(e) => setBuildCommand(e.target.value)}
-              className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
-              placeholder="npm run build"
-            />
-          </div>
+          )}
         </div>
 
-        <div className="space-y-4 pt-4 border-t border-white/5">
+        {/* Environment Variables Section */}
+        <div className="space-y-4 pt-6 border-t border-white/5">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-              <Settings className="w-3.5 h-3.5" />
+              <Zap className="w-3.5 h-3.5" />
               Environment Variables
             </h3>
-            <button 
-              type="button"
-              onClick={addEnvVar}
-              className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest"
-            >
-              + Add Variable
-            </button>
+            <div className="flex gap-4">
+              <button 
+                type="button"
+                onClick={linkDatabase}
+                className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-widest flex items-center gap-1"
+              >
+                <Zap className="w-3 h-3 fill-current" /> Link Managed DB
+              </button>
+              <button 
+                type="button"
+                onClick={addEnvVar}
+                className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest"
+              >
+                + Add Variable
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             {envVars.map((v, i) => (
