@@ -29,7 +29,21 @@ import adminRoutes from './routes/adminRoutes';
 const app = express();
 app.set('trust proxy', 1);
 
-// Health Check
+// Security & CORS Middlewares
+app.use(cors({
+  origin: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
+
+app.set('strict routing', false);
+app.set('case sensitive routing', false);
+app.use(helmet({
+  contentSecurityPolicy: false, 
+}));
+
+// Health Check (Now protected by CORS)
 app.get('/health', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -39,18 +53,6 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Security Middlewares
-app.set('strict routing', false);
-app.set('case sensitive routing', false);
-app.use(helmet({
-  contentSecurityPolicy: false, 
-}));
-app.use(cors({
-  origin: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
-}));
 app.use(standardRateLimiter);
 
 // Logging
@@ -98,7 +100,7 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       return res.status(404).send('<h1>Deployment record not found</h1>');
     }
 
-    const buildRoot = path.join(process.cwd(), 'temp-builds', id);
+    const buildRoot = path.join(process.cwd(), 'temp-builds', deployment.projectId);
     
     // --- SELF-HEALING ENGINE (EPHEMERAL FS RECOVERY) ---
     if (!fs.existsSync(buildRoot)) {
@@ -281,22 +283,30 @@ app.use(async (req, res, next) => {
       // We don't want to infinite loop or serve index.html here
       if (!subPath || subPath === 'index.html') return next();
 
-      const buildRoot = path.join(process.cwd(), 'temp-builds', id);
-      if (fs.existsSync(buildRoot)) {
-        // Try all common search folders for this ID
-        const searchFolders = [
-          buildRoot,
-          path.join(buildRoot, 'dist'),
-          path.join(buildRoot, 'build'),
-          path.join(buildRoot, 'public'),
-          path.join(buildRoot, 'client', 'dist'),
-          path.join(buildRoot, 'frontend', 'dist'),
-        ];
+      // Find the deployment to get the projectId
+      const deployment = await prisma.deployment.findUnique({
+        where: { id },
+        select: { projectId: true }
+      });
 
-        for (const folder of searchFolders) {
-          const targetFile = path.join(folder, subPath);
-          if (fs.existsSync(targetFile) && !fs.lstatSync(targetFile).isDirectory()) {
-            return res.sendFile(targetFile);
+      if (deployment) {
+        const buildRoot = path.join(process.cwd(), 'temp-builds', deployment.projectId);
+        if (fs.existsSync(buildRoot)) {
+          // Try all common search folders for this ID
+          const searchFolders = [
+            buildRoot,
+            path.join(buildRoot, 'dist'),
+            path.join(buildRoot, 'build'),
+            path.join(buildRoot, 'public'),
+            path.join(buildRoot, 'client', 'dist'),
+            path.join(buildRoot, 'frontend', 'dist'),
+          ];
+
+          for (const folder of searchFolders) {
+            const targetFile = path.join(folder, subPath);
+            if (fs.existsSync(targetFile) && !fs.lstatSync(targetFile).isDirectory()) {
+              return res.sendFile(targetFile);
+            }
           }
         }
       }

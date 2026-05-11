@@ -6,6 +6,9 @@ import logger from '../config/logger';
 const connection = new IORedis(config.REDIS_URL, {
   maxRetriesPerRequest: null,
   connectTimeout: 10000,
+  tls: {
+    rejectUnauthorized: false
+  },
   retryStrategy: (times) => Math.min(times * 100, 3000),
   reconnectOnError: (err) => {
     const targetError = 'READONLY';

@@ -9,6 +9,9 @@ export const getApiUrl = () => {
 };
 
 export const getSocketUrl = () => {
-  // WebSockets should connect directly to Render for real-time performance
+  // Use local API for development, Render for production
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:4000';
+  }
   return 'https://deployflow-api.onrender.com';
 };

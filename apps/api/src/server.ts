@@ -22,20 +22,28 @@ const PORT = config.PORT || 4000;
 async function bootstrap() {
   try {
     // 1. Connect to Database
-    await prisma.$connect();
-    logger.info('🐘 Connected to Database');
+    await prisma.$connect()
+      .then(() => logger.info('🐘 Connected to Database'))
+      .catch((err) => {
+        logger.error('❌ Database connection failed:', err.message);
+        logger.warn('⚠️ API running in limited mode (unreachable DB)');
+      });
 
-    // 2. Cleanup stuck builds
-    await BuildService.cleanupStuckBuilds();
-    logger.info('🧹 Cleaned up stuck builds');
+    // 2. Cleanup stuck builds (Only if DB is connected)
+    try {
+      await BuildService.cleanupStuckBuilds();
+      logger.info('🧹 Cleaned up stuck builds');
+    } catch (e) {
+      logger.warn('⚠️ Could not cleanup builds: DB unreachable');
+    }
 
-    // 2. Start Server
+    // 3. Start Server
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on http://localhost:${PORT}`);
       logger.info(`📡 WebSocket server ready`);
     });
   } catch (error) {
-    logger.error('💥 Failed to start server:', error);
+    logger.error('💥 Critical failure during bootstrap:', error);
     process.exit(1);
   }
 }

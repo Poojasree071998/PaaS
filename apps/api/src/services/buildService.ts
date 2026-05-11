@@ -48,10 +48,6 @@ export class BuildService {
   }
 
   static async runBuild(deploymentId: string) {
-    if (buildingDeployments.has(deploymentId)) {
-      logger.warn(`Build already in progress for deployment ${deploymentId}, skipping.`);
-      return;
-    }
 
     const deployment = await prisma.deployment.findUnique({
       where: { id: deploymentId },
@@ -77,7 +73,11 @@ export class BuildService {
       runningProcesses.delete(deploymentId);
     }
 
-    buildingDeployments.add(deploymentId);
+    if (buildingDeployments.has(deployment.projectId)) {
+      await this.log(deploymentId, `⏳ Another build is in progress for this project. Please wait...`, LogLevel.WARN);
+      return;
+    }
+    buildingDeployments.add(deployment.projectId);
     const buildDir = path.resolve(process.cwd(), 'temp-builds', deployment.projectId);
     
     try {
@@ -223,6 +223,7 @@ export class BuildService {
           '--prefer-offline',
           '--no-audit',
           '--no-fund',
+          '--no-bin-links',
           '--legacy-peer-deps',
           '--loglevel', 'error'
         ];
@@ -232,12 +233,24 @@ export class BuildService {
         } catch (error) {
           if (hasLock) {
             await this.log(deploymentId, `⚠️ npm ci failed. Falling back to standard npm install...`, LogLevel.WARN);
-            await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
+            await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-bin-links'], workingDir, env, 1200000);
           } else {
             throw error;
           }
         }
+
         await this.log(deploymentId, `✅ Dependencies synchronized.`, LogLevel.INFO);
+      }
+
+      // --- SMART SUBFOLDER DETECTOR (Always check subfolders) ---
+      // We run these sequentially to avoid Windows file locks
+      if (fs.existsSync(path.join(workingDir, 'backend', 'package.json'))) {
+        await this.log(deploymentId, `📦 Backend subfolder detected. Synchronizing backend dependencies...`, LogLevel.INFO);
+        await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefix', 'backend', '--no-audit', '--no-fund', '--no-bin-links'], workingDir, env, 600000);
+      }
+      if (fs.existsSync(path.join(workingDir, 'frontend', 'package.json'))) {
+        await this.log(deploymentId, `📦 Frontend subfolder detected. Synchronizing frontend dependencies...`, LogLevel.INFO);
+        await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefix', 'frontend', '--no-audit', '--no-fund', '--no-bin-links'], workingDir, env, 600000);
       }
 
       // --- STEP 6: BUILD PROCESS ---
@@ -296,9 +309,9 @@ export class BuildService {
       }
 
       // --- SUCCESS ---
-      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'deployflow-api';
-      if (!apiUrl.startsWith('http')) apiUrl = `https://${apiUrl}`;
-      if (!apiUrl.includes('.')) apiUrl = `${apiUrl}.onrender.com`;
+      let apiUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:4000' 
+        : (process.env.APP_DOMAIN ? `https://${process.env.APP_DOMAIN}` : 'https://deployflow-api.onrender.com');
       
       const projectUrl = `${apiUrl}/live/${deploymentId}`;
 
@@ -328,7 +341,7 @@ export class BuildService {
 
       await this.log(deploymentId, `✨ SUCCESS! Live at: ${projectUrl}`, LogLevel.INFO);
     } catch (error: any) {
-      buildingDeployments.delete(deploymentId);
+      if (deployment?.projectId) buildingDeployments.delete(deployment.projectId);
       let rawError = error.message || 'Build failed';
       const friendlyMessage = this.translateError(rawError);
       
@@ -345,7 +358,7 @@ export class BuildService {
       getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.ERROR);
       await this.log(deploymentId, `❌ FAILED: ${friendlyMessage}`, LogLevel.ERROR);
     } finally {
-      buildingDeployments.delete(deploymentId);
+      if (deployment?.projectId) buildingDeployments.delete(deployment.projectId);
     }
   }
 
@@ -433,45 +446,96 @@ export class BuildService {
   }
 
   private static async patchHardcodedLinks(dir: string, deploymentId: string, env: any) {
-    const files = await fsPromises.readdir(dir, { recursive: true });
-    let patchedCount = 0;
-
     const mongoUrl = env.MONGODB_URI || '';
     const pgUrl = env.DATABASE_URL || '';
+    let patchedCount = 0;
 
-    for (const file of files) {
-      const fullPath = path.join(dir, file as string);
-      const stat = await fsPromises.stat(fullPath).catch(() => null);
-      if (!stat) continue;
-      
-      if (stat.isFile() && (fullPath.endsWith('.js') || fullPath.endsWith('.ts') || fullPath.endsWith('.env') || fullPath.endsWith('.json'))) {
-        let content = await fsPromises.readFile(fullPath, 'utf8');
-        const originalContent = content;
-
-        // Replace MongoDB localhost links with real values if available
-        if (mongoUrl) {
-          content = content.replace(/(mongodb:\/\/)?localhost:27017[^\s'"`]*/g, mongoUrl);
-          content = content.replace(/(mongodb:\/\/)?127\.0\.0\.1:27017[^\s'"`]*/g, mongoUrl);
-        }
+    const walk = async (currentDir: string) => {
+      const files = await fsPromises.readdir(currentDir);
+      for (const file of files) {
+        if (file === 'node_modules' || file === '.git' || file === 'npm-cache') continue;
         
-        // Replace Postgres localhost links with real values if available
-        if (pgUrl) {
-          content = content.replace(/(postgresql:\/\/)?localhost:5432[^\s'"`]*/g, pgUrl);
-          content = content.replace(/(postgresql:\/\/)?127\.0\.0\.1:5432[^\s'"`]*/g, pgUrl);
-        }
+        const fullPath = path.join(currentDir, file);
+        const stat = await fsPromises.stat(fullPath);
+        
+        if (stat.isDirectory()) {
+          await walk(fullPath);
+        } else if (stat.isFile() && (file.endsWith('.js') || file.endsWith('.ts') || file.endsWith('.env') || file.endsWith('.json'))) {
+          let content = await fsPromises.readFile(fullPath, 'utf8');
+          const originalContent = content;
 
-        // Smart Port Patching: help apps listen on the dynamic port
-        const originalBeforePort = content;
-        content = content.replace(/listen\(3000\)/g, 'listen(process.env.PORT || 3000)');
-        content = content.replace(/port\s*=\s*3000/g, `port = process.env.PORT || 3000`);
-        content = content.replace(/:3000/g, `:${env.PORT || 3000}`); // Replace internal 3000 references
+          if (mongoUrl) {
+            content = content.replace(/(mongodb:\/\/)?localhost:27017[^\s'"`]*/g, mongoUrl);
+            content = content.replace(/(mongodb:\/\/)?127\.0\.0\.1:27017[^\s'"`]*/g, mongoUrl);
+          }
+          if (pgUrl) {
+            content = content.replace(/(postgresql:\/\/)?localhost:5432[^\s'"`]*/g, pgUrl);
+            content = content.replace(/(postgresql:\/\/)?127\.0\.0\.1:5432[^\s'"`]*/g, pgUrl);
+          }
 
-        if (content !== originalContent) {
-          await fsPromises.writeFile(fullPath, content);
-          patchedCount++;
+          // More robust port patching
+          const portsToPatch = ['3000', '5000', '8000', '8080', '3001'];
+          const originalContentBeforePorts = content;
+
+          portsToPatch.forEach(p => {
+            // Match listen(3000), listen( 3000 ), etc.
+            const listenRegex = new RegExp(`listen\\(\\s*${p}\\s*\\)`, 'g');
+            content = content.replace(listenRegex, `listen(process.env.PORT || ${p})`);
+
+            // Match port = 3000, port: 3000, const port = 3000
+            const assignRegex = new RegExp(`port\\s*[:=]\\s*${p}`, 'gi');
+            content = content.replace(assignRegex, (match) => {
+               const separator = match.includes(':') ? ':' : '=';
+               return `port ${separator} process.env.PORT || ${p}`;
+            });
+
+            // Match URL style :3000
+            const urlRegex = new RegExp(`:${p}(?=[\\s/'"\\?]|$|[^0-9])`, 'g');
+            content = content.replace(urlRegex, `:\${process.env.PORT || ${p}}`);
+          });
+
+          // --- PAAS AUTO-UNIFY: Full-Stack Detection ---
+          if ((file.endsWith('.js') || file.endsWith('.ts')) && 
+              (file.includes('index') || file.includes('app') || file.includes('server')) && 
+              content.includes('express()') && 
+              !content.includes('PAAS AUTO-UNIFY')) {
+            
+            const fullStackServingCode = `
+// --- PAAS AUTO-UNIFY: Serving frontend from backend ---
+const fsSync = require('fs');
+const pathSync = require('path');
+const possiblePaths = [
+    pathSync.join(__dirname, '../frontend/dist'),
+    pathSync.join(__dirname, './frontend/dist'),
+    pathSync.join(__dirname, '../dist'),
+    pathSync.join(__dirname, './dist')
+];
+const frontendBuildPath = possiblePaths.find(p => fsSync.existsSync(p));
+
+if (frontendBuildPath) {
+    console.log('✅ PaaS: Serving frontend from', frontendBuildPath);
+    app.use(express.static(frontendBuildPath));
+    app.get(/^\\/(?!api).*/, (req, res) => {
+        res.sendFile(pathSync.join(frontendBuildPath, 'index.html'));
+    });
+}
+`;
+            if (content.includes('app.listen')) {
+              content = content.replace('app.listen', `${fullStackServingCode}\n\napp.listen`);
+            } else {
+              content += `\n${fullStackServingCode}`;
+            }
+          }
+
+          if (content !== originalContent) {
+            await fsPromises.writeFile(fullPath, content);
+            patchedCount++;
+          }
         }
       }
-    }
+    };
+
+    await walk(dir).catch(e => logger.warn(`Magic Patch partial failure: ${e.message}`));
 
     if (patchedCount > 0) {
       await this.log(deploymentId, `🪄 Magic Patch: Automatically updated ${patchedCount} file(s) with your real Cloud Database links.`, LogLevel.INFO);
@@ -593,6 +657,16 @@ export class BuildService {
     return !!(proc && proc.process && !proc.process.killed);
   }
 
+  static async stopProcess(deploymentId: string) {
+    const existing = runningProcesses.get(deploymentId);
+    if (existing && existing.process) {
+      existing.process.kill('SIGKILL');
+      runningProcesses.delete(deploymentId);
+      return true;
+    }
+    return false;
+  }
+
   static getActiveProcessCount(): number {
     return runningProcesses.size;
   }
@@ -604,15 +678,21 @@ export class BuildService {
     return new Promise((resolve) => {
       const check = () => {
         if (Date.now() - start > timeoutSeconds * 1000) {
+          logger.warn(`Health check timeout on port ${port}`);
           return resolve(false);
         }
 
         const req = http.get(`http://localhost:${port}`, (res: any) => {
           // Any response (even 404) means the server is listening
+          logger.info(`Health check success on port ${port} (Status: ${res.statusCode})`);
           resolve(true);
         });
 
-        req.on('error', () => {
+        req.on('error', (err: any) => {
+          // Only log periodically to avoid spamming
+          if (Math.floor((Date.now() - start) / 1000) % 5 === 0) {
+            logger.info(`Waiting for application to respond on port ${port}...`);
+          }
           setTimeout(check, 2000); // Try again in 2s
         });
 

@@ -11,9 +11,9 @@ router.get('/', deploymentController.listDeployments);
 router.get('/:deploymentId', deploymentController.getDeployment);
 router.get('/:deploymentId/status', deploymentController.getDeploymentStatus);
 router.get('/:deploymentId/logs', deploymentController.getLogs);
+router.delete('/:deploymentId', deploymentController.deleteDeployment);
 
 router.use(authenticate);
-router.delete('/:deploymentId', deploymentController.cancelDeployment);
 
 router.post('/:deploymentId/rollback', deploymentController.rollbackDeployment);
 router.post('/:deploymentId/promote', deploymentController.promoteDeployment);

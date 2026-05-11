@@ -11,6 +11,7 @@ export const initSocket = (server: HttpServer) => {
           "https://deployflow-web.onrender.com", 
           "https://bejewelled-griffin-055a6f.netlify.app",
           "http://localhost:3000",
+          "http://localhost:3001",
           "http://localhost:5173"
         ];
         

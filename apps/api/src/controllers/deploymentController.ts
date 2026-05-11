@@ -210,3 +210,24 @@ export const getDeploymentStatus = async (req: Request, res: Response, next: Nex
     next(error);
   }
 };
+
+export const deleteDeployment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { deploymentId } = req.params;
+    
+    // 1. Stop process if running
+    try {
+      await BuildService.stopProcess(deploymentId);
+    } catch (e) {}
+    
+    // 2. Delete logs first (foreign key constraint)
+    await prisma.buildLog.deleteMany({ where: { deploymentId } });
+    
+    // 3. Delete deployment
+    await prisma.deployment.delete({ where: { id: deploymentId } });
+    
+    res.json({ success: true, message: 'Deployment deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
