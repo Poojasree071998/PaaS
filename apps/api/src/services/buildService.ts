@@ -543,8 +543,13 @@ if (frontendBuildPath) {
     });
 }
 `;
-            if (content.includes('app.listen')) {
-              // Prepend to the entire line containing app.listen to avoid breaking variable assignments like const server = app.listen(...)
+            // Inject auto-unify logic immediately after the express() initialization to ensure it takes precedence over other routes
+            const expressInitRegex = /(\w+)\s*=\s*express\(\)/;
+            if (content.match(expressInitRegex)) {
+              content = content.replace(expressInitRegex, (match, appVar) => {
+                return `${match};\n\n// --- PAAS AUTO-UNIFY: Setup ---\nconst express = require('express');\nconst app = ${appVar};\n${fullStackServingCode}`;
+              });
+            } else if (content.includes('app.listen')) {
               content = content.replace(/^.*app\.listen/m, (match) => `${fullStackServingCode}\n${match}`);
             } else {
               content += `\n${fullStackServingCode}`;

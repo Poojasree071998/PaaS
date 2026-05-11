@@ -13,10 +13,11 @@ router.get('/:deploymentId/status', deploymentController.getDeploymentStatus);
 router.get('/:deploymentId/logs', deploymentController.getLogs);
 router.delete('/:deploymentId', deploymentController.deleteDeployment);
 
+router.post('/:deploymentId/promote', deploymentController.promoteDeployment);
+router.post('/:deploymentId/rollback', deploymentController.rollbackDeployment);
+
 router.use(authenticate);
 
-router.post('/:deploymentId/rollback', deploymentController.rollbackDeployment);
-router.post('/:deploymentId/promote', deploymentController.promoteDeployment);
 router.get('/:deploymentId/checks', deploymentController.getChecks);
 
 export default router;
