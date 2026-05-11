@@ -10,18 +10,42 @@ export class DatabaseService {
     type: DatabaseType;
     projectId?: string;
   }) {
-    // Check team access (Skip check for 'default' team or if no teamId is provided)
-    if (data.teamId && data.teamId !== 'default' && data.teamId !== 'null' && data.teamId !== '') {
-      const member = await prisma.teamMember.findFirst({
-        where: { teamId: data.teamId, userId, inviteAccepted: true }
+    // --- SMART TEAM DETECTION ---
+    let teamId = data.teamId;
+    if (!teamId || teamId === 'default' || teamId === 'null' || teamId === '') {
+      // Find the first team this user belongs to
+      const firstTeam = await prisma.teamMember.findFirst({
+        where: { userId, inviteAccepted: true },
+        select: { teamId: true }
       });
 
-      if (!member) {
-        // Fallback: If the user is trying to create it for themselves, allow it
-        const userExists = await prisma.user.findUnique({ where: { id: userId } });
-        if (!userExists) throw new ForbiddenError('You do not have access to this team');
+      if (firstTeam) {
+        teamId = firstTeam.teamId;
+      } else {
+        // Create a personal team for the user if none exists
+        const newTeam = await prisma.team.create({
+          data: {
+            name: 'Personal Team',
+            slug: `personal-${userId.slice(0, 5)}`,
+            ownerId: userId,
+            members: {
+              create: {
+                userId,
+                role: 'OWNER',
+                inviteAccepted: true
+              }
+            }
+          }
+        });
+        teamId = newTeam.id;
       }
     }
+
+    // Double check access
+    const member = await prisma.teamMember.findFirst({
+      where: { teamId, userId, inviteAccepted: true }
+    });
+    if (!member) throw new ForbiddenError('You do not have access to this team');
 
     // Simulate provisioning
     const dbId = uuidv4().slice(0, 8);
@@ -55,6 +79,7 @@ export class DatabaseService {
     return (prisma.managedDatabase as any).create({
       data: {
         ...data,
+        teamId, // Use the detected or created teamId
         userId, // Link to the user who created it
         status: DatabaseStatus.ACTIVE,
         host,

@@ -78,10 +78,10 @@ export default function DatabasesPage() {
         setShowCreate(false);
         setNewName('');
       } else {
-        alert('Creation failed: ' + data.message);
+        alert('Creation failed: ' + (data.message || data.error || 'Internal Server Error'));
       }
-    } catch (error) {
-      alert('Failed to create database. Please check if the API is running.');
+    } catch (error: any) {
+      alert('Failed to create database: ' + (error.message || 'Check if the API is running.'));
     } finally {
       setCreating(false);
     }

@@ -158,29 +158,62 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {status === 'READY' && (
+        {(status === 'READY' || status === 'ERROR') && (
           <div className="flex flex-wrap gap-4">
-            <a 
-              href={deployment?.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="group flex items-center gap-3 bg-white text-black px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
-            >
-              Open Live Site <ExternalLink className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-            </a>
-            
+            {status === 'READY' && (
+              <>
+                <a 
+                  href={deployment?.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-3 bg-white text-black px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
+                >
+                  Open Live Site <ExternalLink className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                </a>
+                
+                <button
+                  onClick={async () => {
+                    const apiUrl = getApiUrl();
+                    const res = await fetch(`${apiUrl}/api/deployments/${id}/promote`, { method: 'POST' });
+                    const data = await res.json();
+                    if (data.success) {
+                      alert('Successfully promoted to production!');
+                    }
+                  }}
+                  className="flex items-center gap-3 bg-zinc-900 text-white border border-white/10 px-8 py-3 rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
+                >
+                  Promote to Production <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
+
             <button
               onClick={async () => {
-                const apiUrl = getApiUrl();
-                const res = await fetch(`${apiUrl}/api/deployments/${id}/promote`, { method: 'POST' });
-                const data = await res.json();
-                if (data.success) {
-                  alert('Successfully promoted to production!');
+                try {
+                  const apiUrl = getApiUrl();
+                  const res = await fetch(`${apiUrl}/api/deployments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      repoUrl: deployment.project.repoUrl,
+                      branch: deployment.branch || 'main',
+                      buildCommand: deployment.project.buildCommand,
+                      rootDirectory: deployment.project.rootDirectory
+                    })
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    window.location.href = `/dashboard/deployments/${data.data.id}`;
+                  } else {
+                    alert('Redeploy failed: ' + (data.message || 'Check logs'));
+                  }
+                } catch (e) {
+                  alert('Failed to trigger redeploy.');
                 }
               }}
-              className="flex items-center gap-3 bg-zinc-900 text-white border border-white/10 px-8 py-3 rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
+              className="flex items-center gap-3 bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-sm hover:bg-blue-500 transition-all shadow-[0_20px_50px_rgba(37,99,235,0.2)]"
             >
-              Promote to Production <ArrowUpRight className="w-4 h-4" />
+              <Zap className="w-4 h-4" /> Redeploy
             </button>
           </div>
         )}

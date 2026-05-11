@@ -544,7 +544,8 @@ if (frontendBuildPath) {
 }
 `;
             if (content.includes('app.listen')) {
-              content = content.replace('app.listen', `${fullStackServingCode}\n\napp.listen`);
+              // Prepend to the entire line containing app.listen to avoid breaking variable assignments like const server = app.listen(...)
+              content = content.replace(/^.*app\.listen/m, (match) => `${fullStackServingCode}\n${match}`);
             } else {
               content += `\n${fullStackServingCode}`;
             }
