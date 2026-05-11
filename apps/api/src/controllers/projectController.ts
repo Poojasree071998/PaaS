@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProjectService } from '../services/projectService';
 import { AnalysisService } from '../services/analysisService';
+import { BuildService } from '../services/buildService';
 
 export const createProject = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -8,7 +9,17 @@ export const createProject = async (req: Request, res: Response, next: NextFunct
       ...req.body,
       userId: req.user!.id,
     });
-    res.status(201).json({ success: true, data: project });
+
+    // Auto-trigger deployment upon creation
+    const deployment = await BuildService.triggerBuild(project.id, req.user!.id);
+
+    res.status(201).json({ 
+      success: true, 
+      data: { 
+        project, 
+        deploymentId: deployment.id 
+      } 
+    });
   } catch (error) {
     next(error);
   }

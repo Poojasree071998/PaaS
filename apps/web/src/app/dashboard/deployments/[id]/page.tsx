@@ -166,9 +166,14 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                   href={deployment?.url} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="group flex items-center gap-3 bg-white text-black px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
+                  className="group relative flex items-center gap-4 bg-gradient-to-br from-blue-600 to-indigo-700 text-white px-10 py-4 rounded-2xl font-bold text-base hover:scale-[1.02] active:scale-95 transition-all shadow-[0_20px_50px_rgba(37,99,235,0.4)] hover:shadow-[0_20px_60px_rgba(37,99,235,0.6)]"
                 >
-                  Open Live Site <ExternalLink className="w-4 h-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                  <div className="absolute inset-0 bg-white/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_#34d399]" />
+                    Visit Live Project
+                    <ExternalLink className="w-5 h-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                  </div>
                 </a>
                 
                 <button

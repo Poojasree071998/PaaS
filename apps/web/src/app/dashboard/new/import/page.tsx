@@ -51,6 +51,33 @@ export default function ImportProjectPage() {
     setEnvVars(newVars);
   };
 
+  const analyzeUrl = async (repoUrl: string) => {
+    if (!repoUrl || !repoUrl.startsWith('https://github.com/')) return;
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/deployments/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoUrl })
+      });
+      const data = await res.json();
+      if (data.success) {
+        const analysis = data.data;
+        if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
+        if (analysis.rootDirectory) setRootDirectory(analysis.rootDirectory);
+        
+        // Pre-fill environment variables found in .env or code
+        const vars = analysis.requiredEnvVars.map((key: string) => ({
+          key,
+          value: analysis.detectedEnv[key] || ''
+        }));
+        if (vars.length > 0) setEnvVars(vars);
+      }
+    } catch (e) {
+      console.warn('Auto-analysis failed:', e);
+    }
+  };
+
   const handleDeploy = async () => {
     if (!url) return;
     setLoading(true);
@@ -117,119 +144,32 @@ export default function ImportProjectPage() {
               placeholder="https://github.com/user/repo" 
               className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-lg"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                const newUrl = e.target.value;
+                setUrl(newUrl);
+                // Auto-analyze and trigger if it looks like a valid repo URL
+                if (newUrl.startsWith('https://github.com/') && newUrl.split('/').length >= 5 && !loading) {
+                  analyzeUrl(newUrl);
+                  // Small delay to allow user to finish typing
+                  setTimeout(() => {
+                    const btn = document.getElementById('deploy-btn');
+                    if (btn && !btn.hasAttribute('disabled')) btn.click();
+                  }, 2000);
+                }
+              }}
               disabled={loading}
             />
           </div>
           <p className="text-xs text-zinc-500 flex items-center gap-2">
-            <Lock className="w-3 h-3" />
-            Private repositories require GitHub/GitLab authorization.
+            <Zap className="w-3 h-3 text-blue-400" />
+            Paste a URL to start your zero-error deployment automatically.
           </p>
         </div>
 
-        {/* Advanced Settings Toggle */}
-        <div className="border-t border-white/5 pt-6">
-          <button 
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
-          >
-            <Settings className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
-            {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
-          </button>
-
-          {showAdvanced && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                  <GitBranch className="w-3.5 h-3.5" />
-                  Branch
-                </div>
-                <input 
-                  type="text" 
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
-                />
-              </div>
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                  <Settings className="w-3.5 h-3.5" />
-                  Root Dir
-                </div>
-                <input 
-                  type="text" 
-                  value={rootDirectory}
-                  onChange={(e) => setRootDirectory(e.target.value)}
-                  className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
-                />
-              </div>
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                  <Zap className="w-3.5 h-3.5" />
-                  Build
-                </div>
-                <input 
-                  type="text" 
-                  value={buildCommand}
-                  onChange={(e) => setBuildCommand(e.target.value)}
-                  className="bg-transparent border-none p-0 text-sm font-medium text-white focus:ring-0 w-full"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Environment Variables Section */}
-        <div className="space-y-4 pt-6 border-t border-white/5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-              <Zap className="w-3.5 h-3.5" />
-              Environment Variables
-            </h3>
-            <div className="flex gap-4">
-              <button 
-                type="button"
-                onClick={linkDatabase}
-                className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-widest flex items-center gap-1"
-              >
-                <Zap className="w-3 h-3 fill-current" /> Link Managed DB
-              </button>
-              <button 
-                type="button"
-                onClick={addEnvVar}
-                className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest"
-              >
-                + Add Variable
-              </button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {envVars.map((v, i) => (
-              <div key={i} className="grid grid-cols-2 gap-2">
-                <input 
-                  type="text" 
-                  placeholder="VARIABLE_NAME" 
-                  value={v.key}
-                  onChange={(e) => updateEnvVar(i, 'key', e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
-                />
-                <input 
-                  type="text" 
-                  placeholder="value" 
-                  value={v.value}
-                  onChange={(e) => updateEnvVar(i, 'value', e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-white/20"
-                />
-              </div>
-            ))}
-          </div>
-          <p className="text-[10px] text-zinc-500 italic">
-            Tip: Backend services use these variables to connect to databases and external APIs.
-          </p>
-        </div>
-
+        {/* All settings are now handled automatically in the background */}
+        
         <button 
+          id="deploy-btn"
           onClick={handleDeploy}
           disabled={loading || !url}
           className="w-full bg-white text-black py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

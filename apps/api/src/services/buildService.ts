@@ -63,14 +63,16 @@ export class BuildService {
 
     if (!deployment) return;
 
-    // Kill any existing process BEFORE starting build to free up files
-    const existing = runningProcesses.get(deploymentId);
-    if (existing && existing.process) {
-      logger.info(`Killing existing process for deployment ${deploymentId} before rebuild.`);
-      try {
-        existing.process.kill('SIGKILL');
-      } catch (e) {}
-      runningProcesses.delete(deploymentId);
+    // 1. Kill ANY existing process for this project BEFORE starting build
+    // This prevents "Access Denied" or "EPERM" errors on Windows
+    for (const [id, data] of runningProcesses.entries()) {
+      if (data.projectId === deployment.projectId) {
+        logger.info(`Cleaning up stale process for project ${deployment.projectId} (Deployment: ${id})`);
+        try {
+          data.process.kill('SIGKILL');
+        } catch (e) {}
+        runningProcesses.delete(id);
+      }
     }
 
     if (buildingDeployments.has(deployment.projectId)) {
@@ -81,6 +83,11 @@ export class BuildService {
     const buildDir = path.resolve(process.cwd(), 'temp-builds', deployment.projectId);
     
     try {
+      // 2. Windows Stability Delay: Let the OS release file locks after killing processes
+      if (process.platform === 'win32') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
       await prisma.deployment.update({
         where: { id: deploymentId },
         data: { status: DeploymentStatus.BUILDING },
@@ -642,7 +649,11 @@ if (frontendBuildPath) {
       env: { ...process.env, ...env, PORT: port.toString(), NODE_ENV: 'production' }
     });
 
-    runningProcesses.set(deploymentId, { process: child, port });
+    runningProcesses.set(deploymentId, { 
+      process: child, 
+      port,
+      projectId: deployment.projectId // Store projectId for future cleanup
+    });
 
     child.stdout.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.INFO));
     child.stderr.on('data', (data) => this.log(deploymentId, data.toString().trim(), LogLevel.WARN));

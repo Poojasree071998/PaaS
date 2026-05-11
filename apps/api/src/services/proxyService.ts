@@ -2,6 +2,7 @@ import httpProxy from 'http-proxy';
 import { Request, Response } from 'express';
 import logger from '../config/logger';
 import prisma from '../config/prisma';
+import { BuildService } from './buildService';
 
 const proxy = httpProxy.createProxyServer({
   ws: true // Enable WebSocket proxying
@@ -45,9 +46,8 @@ export class ProxyService {
       const deployment = project.productionDeployment;
 
       // 2. Check if the deployment is actually running
-      // Note: In a production environment, we'd check if the process is alive.
-      // For now, we assume it's running on its assigned port.
-      const targetPort = deployment.port || 5000;
+      // Get the real running port from BuildService
+      const targetPort = BuildService.getRunningPort(deployment.id) || deployment.port || 5000;
       const target = `http://localhost:${targetPort}`;
 
       logger.info(`Proxying request for ${slug} to ${target}`);

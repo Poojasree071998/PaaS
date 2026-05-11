@@ -139,10 +139,29 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
         // If proxy fails, the process might be dead. Try to restart.
         BuildService.runBuild(id).catch(() => {});
         res.status(502).send(`
-          <div style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto; text-align: center;">
-            <h1 style="color: #ef4444;">Waking Up Backend...</h1>
-            <p style="color: #71717a;">The backend process for this project is currently starting up. This usually takes 30-60 seconds.</p>
-            <script>setTimeout(() => window.location.reload(), 10000);</script>
+          <div style="font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; background: #09090b; color: white;">
+            <div style="text-align: center; max-width: 400px; padding: 20px;">
+              <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; animate: spin 1s linear infinite; margin: 0 auto 20px; animation: spin 1s linear infinite;"></div>
+              <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 12px;">Waking Up Backend...</h1>
+              <p style="color: #a1a1aa; line-height: 1.6;">The backend process for this project is currently starting up. This usually takes 30-60 seconds.</p>
+              <div id="status" style="margin-top: 20px; font-size: 13px; color: #71717a;">Connecting...</div>
+            </div>
+            <style>
+              @keyframes spin { to { transform: rotate(360deg); } }
+            </style>
+            <script>
+              async function poll() {
+                try {
+                  const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
+                  if (res.status < 500) {
+                    window.location.reload();
+                    return;
+                  }
+                } catch (e) {}
+                setTimeout(poll, 2000);
+              }
+              poll();
+            </script>
           </div>
         `);
       });
