@@ -42,8 +42,8 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
     if (status === 'READY') return 4;
     if (status === 'ERROR') return 0;
     
-    const lastStepLog = [...logs].reverse().find(l => l.content.match(/\[(\d)\/4\]/));
-    if (lastStepLog) {
+    const lastStepLog = [...logs].reverse().find(l => l.content?.match(/\[(\d)\/4\]/));
+    if (lastStepLog && lastStepLog.content) {
       const match = lastStepLog.content.match(/\[(\d)\/4\]/);
       return match ? parseInt(match[1]) : 1;
     }
@@ -94,10 +94,16 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
     const socket = io(socketUrl);
     socket.emit('join:deployment', id);
 
-    socket.on('deployment:log', (log: Log) => {
+    socket.on('deployment:log', (log: any) => {
       setLogs((prev) => {
         if (prev.some(l => l.id === log.id)) return prev;
-        return [...prev, log];
+        const normalizedLog = {
+          id: log.id || Math.random().toString(36).substr(2, 9),
+          content: log.content || log.message || '',
+          level: (log.level || 'info').toLowerCase(),
+          timestamp: log.timestamp || new Date().toISOString()
+        };
+        return [...prev, normalizedLog];
       });
     });
 

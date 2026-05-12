@@ -43,14 +43,11 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
 
     // 3. Find or create a project
     let project = await prisma.project.findFirst({ where: { repoUrl } });
-    if (!project) {
-      // Auto-Detect Framework before creation
-      let detectedFramework: Framework = Framework.STATIC;
-      try {
-        const analysis = await AnalysisService.analyzeRepository(repoUrl);
-        if (analysis.framework) detectedFramework = analysis.framework as Framework;
-      } catch (e) {}
+    
+    // Always analyze for fresh settings (True Auto-Pilot)
+    const analysis = await AnalysisService.analyzeRepository(repoUrl);
 
+    if (!project) {
       const name = repoUrl.split('/').pop() || 'new-project';
       project = await prisma.project.create({
         data: {
@@ -59,22 +56,42 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
           repoUrl,
           repoProvider: RepoProvider.GITHUB,
           repoId: 'manual',
-          framework: detectedFramework,
+          framework: (analysis.framework as Framework) || Framework.STATIC,
           teamId: team.id,
           userId,
-          buildCommand: buildCommand || 'npm run build',
+          buildCommand: buildCommand || analysis.buildCommand || 'npm run build',
           repoBranch: branch || 'main',
-          rootDirectory: rootDirectory || '/'
+          rootDirectory: rootDirectory || analysis.rootDirectory || './'
         }
       });
+
+      // --- AUTO-PROVISIONING (Zero-Config DB) ---
+      if (analysis.databaseRequired !== 'NONE') {
+        const dbType = analysis.databaseRequired;
+        const existingDb = await prisma.managedDatabase.findFirst({
+          where: { projectId: project.id, type: dbType as any }
+        });
+
+        if (!existingDb) {
+          const { DatabaseService } = require('../services/databaseService');
+          await DatabaseService.provisionDatabase(userId, {
+            projectId: project.id,
+            teamId: team.id,
+            name: `${name}-db`,
+            type: dbType,
+            plan: 'FREE'
+          }).catch((e: any) => console.error('Auto-provisioning failed:', e));
+        }
+      }
     } else {
-      // Update existing project with new settings if provided
+      // Update existing project with new settings if provided, else use analysis
       project = await prisma.project.update({
         where: { id: project.id },
         data: {
-          buildCommand: buildCommand || project.buildCommand,
+          buildCommand: buildCommand || project.buildCommand || analysis.buildCommand,
           repoBranch: branch || project.repoBranch,
-          rootDirectory: rootDirectory || project.rootDirectory
+          rootDirectory: rootDirectory || project.rootDirectory || analysis.rootDirectory,
+          framework: (analysis.framework as Framework) || project.framework
         }
       });
     }

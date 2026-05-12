@@ -7,12 +7,17 @@ import {
   Lock,
   GitBranch,
   Settings,
-  Zap
+  Zap,
+  Box,
+  Plus,
+  Server,
+  Database
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getApiUrl } from '@/lib/api';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 
 export default function ImportProjectPage() {
   const [url, setUrl] = useState('');
@@ -22,7 +27,29 @@ export default function ImportProjectPage() {
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [envVars, setEnvVars] = useState([{ key: '', value: '' }]);
+  const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
+  const [detectedDb, setDetectedDb] = useState<string | null>(null);
   const router = useRouter();
+  
+  // --- PERSISTENCE LOGIC ---
+  useEffect(() => {
+    const saved = localStorage.getItem('df_project_draft');
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        if (draft.url) setUrl(draft.url);
+        if (draft.branch) setBranch(draft.branch);
+        if (draft.rootDirectory) setRootDirectory(draft.rootDirectory);
+        if (draft.buildCommand) setBuildCommand(draft.buildCommand);
+        if (draft.envVars) setEnvVars(draft.envVars);
+      } catch (e) { console.error('Draft recovery failed'); }
+    }
+  }, []);
+
+  useEffect(() => {
+    const draft = { url, branch, rootDirectory, buildCommand, envVars };
+    localStorage.setItem('df_project_draft', JSON.stringify(draft));
+  }, [url, branch, rootDirectory, buildCommand, envVars]);
 
   const linkDatabase = async () => {
     try {
@@ -63,6 +90,8 @@ export default function ImportProjectPage() {
       const data = await res.json();
       if (data.success) {
         const analysis = data.data;
+        if (analysis.framework) setDetectedFramework(analysis.framework);
+        if (analysis.databaseRequired !== 'NONE') setDetectedDb(analysis.databaseRequired);
         if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
         if (analysis.rootDirectory) setRootDirectory(analysis.rootDirectory);
         
@@ -84,11 +113,6 @@ export default function ImportProjectPage() {
     
     try {
       const apiUrl = getApiUrl();
-      console.log('🚀 Triggering deployment at:', `${apiUrl}/api/deployments`);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for Render cold starts and busy builds
-
       const response = await fetch(`${apiUrl}/api/deployments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -98,25 +122,17 @@ export default function ImportProjectPage() {
           rootDirectory,
           buildCommand,
           envVars: envVars.filter(v => v.key && v.value)
-        }),
-        signal: controller.signal
+        })
       });
-      
-      clearTimeout(timeoutId);
       const data = await response.json();
-      
       if (data.success) {
+        localStorage.removeItem('df_project_draft'); // Clear draft on success
         router.push(`/dashboard/deployments/${data.data.id}`);
       } else {
         alert(`API Error: ${data.error?.message || 'Unknown error'}`);
       }
     } catch (error: any) {
-      console.error('Deployment failed:', error);
-      if (error.name === 'AbortError') {
-        alert('Request timed out. The API might be sleeping or unreachable. Please try again in 30 seconds.');
-      } else {
-        alert(`Deployment failed: ${error.message}. Please check if the API is awake at ${getApiUrl()}`);
-      }
+      alert(`Deployment failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -130,7 +146,7 @@ export default function ImportProjectPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Import Repository</h1>
-          <p className="text-zinc-500">Provide a public repository URL to get started.</p>
+          <p className="text-zinc-500">Auto-Pilot will handle your configuration automatically.</p>
         </div>
       </div>
 
@@ -147,29 +163,130 @@ export default function ImportProjectPage() {
               onChange={(e) => {
                 const newUrl = e.target.value;
                 setUrl(newUrl);
-                // Auto-analyze and trigger if it looks like a valid repo URL
-                if (newUrl.startsWith('https://github.com/') && newUrl.split('/').length >= 5 && !loading) {
+                if (newUrl.startsWith('https://github.com/') && newUrl.split('/').length >= 5) {
                   analyzeUrl(newUrl);
-                  // Small delay to allow user to finish typing
-                  setTimeout(() => {
-                    const btn = document.getElementById('deploy-btn');
-                    if (btn && !btn.hasAttribute('disabled')) btn.click();
-                  }, 2000);
                 }
               }}
               disabled={loading}
             />
           </div>
+          
+          {(detectedFramework || detectedDb) && (
+            <div className="flex flex-wrap gap-2 animate-in zoom-in duration-300">
+              {detectedFramework && (
+                <div className="flex items-center gap-2 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 text-xs font-bold uppercase tracking-tighter">
+                  <Server className="w-3 h-3" /> Framework: {detectedFramework}
+                </div>
+              )}
+              {detectedDb && (
+                <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20 text-xs font-bold uppercase tracking-tighter">
+                  <Database className="w-3 h-3" /> Auto-Provisioning: {detectedDb}
+                </div>
+              )}
+            </div>
+          )}
+
           <p className="text-xs text-zinc-500 flex items-center gap-2">
             <Zap className="w-3 h-3 text-blue-400" />
-            Paste a URL to start your zero-error deployment automatically.
+            Paste a URL to start your zero-config deployment automatically.
           </p>
         </div>
 
-        {/* All settings are now handled automatically in the background */}
+        <div className="pt-2">
+          <button 
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors text-sm font-medium"
+          >
+            <Settings className={cn("w-4 h-4 transition-transform", showAdvanced && "rotate-90")} />
+            {showAdvanced ? 'Hide Project Settings' : 'Configure Project Settings (Advanced)'}
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Production Branch</label>
+                  <div className="relative group/input">
+                    <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within/input:text-blue-400 transition-colors" />
+                    <input 
+                      type="text" 
+                      value={branch}
+                      onChange={(e) => setBranch(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:ring-1 focus:ring-blue-500/50 outline-none transition-all text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Root Directory</label>
+                  <div className="relative group/input">
+                    <Box className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within/input:text-blue-400 transition-colors" />
+                    <input 
+                      type="text" 
+                      value={rootDirectory}
+                      onChange={(e) => setRootDirectory(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:ring-1 focus:ring-blue-500/50 outline-none transition-all text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Build Command</label>
+                <div className="relative group/input">
+                  <Zap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within/input:text-blue-400 transition-colors" />
+                  <input 
+                    type="text" 
+                    value={buildCommand}
+                    onChange={(e) => setBuildCommand(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:ring-1 focus:ring-blue-500/50 outline-none transition-all text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Environment Variables</label>
+                  <button 
+                    onClick={linkDatabase}
+                    className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20 hover:bg-blue-500/20 transition-all uppercase font-bold"
+                  >
+                    Link Managed Database
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {envVars.map((v, i) => (
+                    <div key={i} className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                      <input 
+                        type="text" 
+                        placeholder="KEY"
+                        value={v.key}
+                        onChange={(e) => updateEnvVar(i, 'key', e.target.value)}
+                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:ring-1 focus:ring-blue-500/50 outline-none"
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="VALUE"
+                        value={v.value}
+                        onChange={(e) => updateEnvVar(i, 'value', e.target.value)}
+                        className="flex-[2] bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:ring-1 focus:ring-blue-500/50 outline-none"
+                      />
+                    </div>
+                  ))}
+                  <button 
+                    onClick={addEnvVar}
+                    className="w-full py-2 border border-dashed border-white/10 rounded-lg text-zinc-500 hover:text-white hover:border-white/20 transition-all text-xs font-medium flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-3 h-3" /> Add Variable
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         
         <button 
-          id="deploy-btn"
           onClick={handleDeploy}
           disabled={loading || !url}
           className="w-full bg-white text-black py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -186,9 +303,11 @@ export default function ImportProjectPage() {
       </div>
 
       <div className="glass-card p-6 bg-blue-500/5 border-blue-500/20">
-        <h3 className="font-semibold text-blue-400 mb-2">How it works</h3>
+        <h3 className="font-semibold text-blue-400 mb-2 flex items-center gap-2">
+          <Zap className="w-4 h-4" /> Auto-Pilot Mode
+        </h3>
         <p className="text-sm text-zinc-400 leading-relaxed">
-          DeployFlow will automatically detect your framework, install dependencies, and build your project. Once deployed, you'll get a generated URL and can connect your own custom domain.
+          DeployFlow automatically scans your code to detect frameworks and database requirements. If your project needs a database, we'll provision one for you automatically.
         </p>
       </div>
     </div>

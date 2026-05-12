@@ -29,6 +29,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@tailwindcss/postcss": "^4.2.4"
+    "@tailwindcss/postcss": "^4.2.4",
+    "cross-env": "^10.1.0"
   }
 }

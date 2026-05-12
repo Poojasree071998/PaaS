@@ -66,9 +66,9 @@ export class DatabaseService {
       port = 6379;
       connectionString = `redis://:${password}@${host}:${port}`;
     } else if (data.type === DatabaseType.MONGODB) {
-      host = process.env.MANAGED_MONGO_HOST || 'mongo.deployflow.io';
+      host = process.env.MANAGED_MONGO_HOST || '127.0.0.1';
       port = 27017;
-      connectionString = `mongodb+srv://${username}:${password}@${host}/${dbName}?retryWrites=true&w=majority`;
+      connectionString = `mongodb://${username}:${password}@${host}:${port}/${dbName}?authSource=admin`;
     } else {
       // Default fallback
       host = 'db.deployflow.io';

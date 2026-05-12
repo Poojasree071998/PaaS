@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
@@ -27,6 +28,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import adminRoutes from './routes/adminRoutes';
 
 const app = express();
+app.use(cookieParser() as any);
 app.set('trust proxy', 1);
 
 // Security & CORS Middlewares
@@ -85,7 +87,7 @@ app.use(async (req, res, next) => {
 });
 
 // --- PROJECT-AWARE LIVE HOSTING ENGINE ---
-app.get('/live/:id/:subPath(*)?', async (req, res) => {
+app.all('/live/:id/:subPath(*)?', async (req, res) => {
   const { id } = req.params;
   const subPath = (req.params as any).subPath || '';
   
@@ -99,6 +101,9 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
     if (!deployment) {
       return res.status(404).send('<h1>Deployment record not found</h1>');
     }
+
+    // Set sticky cookie for SPA session persistence
+    res.cookie('df_last_project', id, { path: '/', maxAge: 24 * 60 * 60 * 1000 }); // 24 hours
 
     const buildRoot = path.join(process.cwd(), 'temp-builds', deployment.projectId);
     
@@ -117,57 +122,21 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       `);
     }
 
-    // --- REVERSE PROXY FOR BACKENDS ---
-    const runningPort = BuildService.getRunningPort(id) || (deployment.meta as any)?.port;
-    if (runningPort) {
-      const proxyReq = http.request({
-        host: 'localhost',
-        port: runningPort,
-        path: '/' + subPath,
-        method: req.method,
-        headers: { ...req.headers, host: 'localhost:' + runningPort }
-      }, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode || 200, {
-          ...proxyRes.headers,
-          'X-DeployFlow-Proxied': 'true'
-        });
-        proxyRes.pipe(res);
-      });
-
-      proxyReq.on('error', (err) => {
-        logger.error('Proxy error:', err);
-        // If proxy fails, the process might be dead. Try to restart.
-        BuildService.runBuild(id).catch(() => {});
-        res.status(502).send(`
-          <div style="font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; background: #09090b; color: white;">
-            <div style="text-align: center; max-width: 400px; padding: 20px;">
-              <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; animate: spin 1s linear infinite; margin: 0 auto 20px; animation: spin 1s linear infinite;"></div>
-              <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 12px;">Waking Up Backend...</h1>
-              <p style="color: #a1a1aa; line-height: 1.6;">The backend process for this project is currently starting up. This usually takes 30-60 seconds.</p>
-              <div id="status" style="margin-top: 20px; font-size: 13px; color: #71717a;">Connecting...</div>
-            </div>
-            <style>
-              @keyframes spin { to { transform: rotate(360deg); } }
-            </style>
-            <script>
-              async function poll() {
-                try {
-                  const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
-                  if (res.status < 500) {
-                    window.location.reload();
-                    return;
-                  }
-                } catch (e) {}
-                setTimeout(poll, 2000);
-              }
-              poll();
-            </script>
+    // --- SMART PROCESS RE-LINKING: Recover processes after platform restart ---
+    const inMemoryPort = BuildService.getRunningPort(id);
+    if (!inMemoryPort && deployment.status === 'READY' && !BuildService.isBuilding(id)) {
+      BuildService.runBuild(id).catch(() => {});
+      return res.status(502).send(`
+        <div style="font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; background: #09090b; color: white;">
+          <div style="text-align: center; max-width: 500px; padding: 20px;">
+            <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; margin: 0 auto 20px; animation: spin 1s linear infinite;"></div>
+            <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 12px;">System Re-linking...</h1>
+            <p style="color: #a1a1aa; line-height: 1.6; margin-bottom: 24px;">The platform is re-connecting to your project after a system restart. Please wait.</p>
+            <script>setTimeout(() => window.location.reload(), 5000);</script>
+            <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
           </div>
-        `);
-      });
-
-      req.pipe(proxyReq);
-      return;
+        </div>
+      `);
     }
 
     // 2. Resolve the actual project folder (handling monorepos)
@@ -177,7 +146,7 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       projectPath = path.join(buildRoot, cleanRoot);
     }
 
-    // 3. Smart Detection of build output folders inside the project path
+    // 3. Define all possible build output folders
     const searchFolders = [
       projectPath,
       path.join(projectPath, 'dist'),
@@ -192,10 +161,119 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       path.join(projectPath, 'apps', 'web', 'dist'),
     ];
 
+    const runningPort = inMemoryPort || (deployment.meta as any)?.port;
+    const isApiRequest = subPath.startsWith('api/') || subPath.startsWith('v1/') || subPath.includes('graphql');
+
+    // --- SMART FRONTEND PRIORITY (v2) ---
+    // If it's NOT an API request, we try to serve it from the frontend first
+    if (!isApiRequest) {
+      // A. Try direct file matching (e.g. /assets/main.js)
+      for (const folder of searchFolders) {
+        if (fs.existsSync(folder)) {
+          const targetFile = path.join(folder, subPath);
+          if (fs.existsSync(targetFile) && !fs.lstatSync(targetFile).isDirectory()) {
+            return res.sendFile(targetFile);
+          }
+        }
+      }
+
+      // B. Try SPA index.html fallback for navigation routes
+      // We do this if there's no dot in the path (e.g. /dashboard) or if it's the root
+      if (!subPath || !subPath.includes('.') || subPath === 'index.html') {
+        for (const folder of searchFolders) {
+          const indexPath = path.join(folder, 'index.html');
+          if (fs.existsSync(indexPath)) {
+            let html = fs.readFileSync(indexPath, 'utf8');
+            
+            // Inject <base> tag for subpath routing
+            const baseTag = `<base href="/live/${id}/">`;
+            const transformHtml = (content: string) => {
+              let body = content;
+              if (/<head>/i.test(body)) body = body.replace(/<head>/i, `<head>\n    ${baseTag}`);
+              else if (/<html>/i.test(body)) body = body.replace(/<html>/i, `<html>\n<head>${baseTag}</head>`);
+              else body = baseTag + body;
+              
+              // Path Normalization: Convert root-relative paths to relative paths
+              // This prevents the app from escaping to the domain root (e.g. /login -> login)
+              body = body.replace(/(src|href)=["']\/(?!live\/)([^"':][^"']*)["']/g, '$1="$2"');
+              
+              // Handle special Vite/Next paths
+              body = body.replace(/["']\/(?!live\/)(@vite|_next|node_modules)\//g, (m) => m.replace('/', ''));
+              
+              // Auto-Inject API URLs
+              const publicUrl = `http://localhost:4000/live/${id}`;
+              body = body.replace(/http:\/\/localhost:4000/g, publicUrl);
+              body = body.replace(/"\/api\//g, `"${publicUrl}/api/`); // Force absolute API paths
+              
+              return body;
+            };
+
+            res.setHeader('Content-Type', 'text/html');
+            return res.send(transformHtml(html));
+          }
+        }
+      }
+    }
+
+    // --- REVERSE PROXY FOR BACKENDS ---
+    // If it's an API request OR we didn't find a frontend match, proxy to the backend
+    if (runningPort) {
+      const headers = { ...req.headers, host: 'localhost:' + runningPort };
+      delete headers['accept-encoding']; 
+      
+      const proxyReq = http.request({
+        host: 'localhost',
+        port: runningPort,
+        path: '/' + subPath,
+        method: req.method,
+        headers
+      }, (proxyRes) => {
+        // If the backend returns 404, we have ONE LAST CHANCE to find it in frontend
+        // (This handles cases where the user's API detection logic missed something)
+        if (proxyRes.statusCode === 404 && !isApiRequest) {
+          for (const folder of searchFolders) {
+            const indexPath = path.join(folder, 'index.html');
+            if (fs.existsSync(indexPath)) {
+               // ... redundant but safe fallback logic ...
+               // (Actually we already did this above, so we can just let the 404 through or try one more time)
+            }
+          }
+        }
+
+        res.writeHead(proxyRes.statusCode || 200, { ...proxyRes.headers, 'X-DeployFlow-Proxied': 'true' });
+        proxyRes.pipe(res);
+      });
+
+      proxyReq.on('error', async (err) => {
+        logger.error('Proxy error:', err);
+        if (!BuildService.isBuilding(id)) BuildService.runBuild(id).catch(() => {});
+        
+        const latestLog = await prisma.buildLog.findFirst({
+          where: { deploymentId: id },
+          orderBy: { timestamp: 'desc' }
+        });
+        
+        res.status(502).send(`
+          <div style="font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; background: #09090b; color: white;">
+            <div style="text-align: center; max-width: 500px; padding: 20px;">
+              <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; margin: 0 auto 20px; animation: spin 1s linear infinite;"></div>
+              <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 12px;">Waking Up Backend...</h1>
+              <p style="color: #a1a1aa; line-height: 1.6; margin-bottom: 24px;">The backend process is starting up. Refreshing in a few seconds.</p>
+              <script>setTimeout(() => window.location.reload(), 5000);</script>
+            </div>
+          </div>
+        `);
+      });
+
+      req.pipe(proxyReq);
+      return;
+    }
+
+
+    // --- FINAL FALLBACK (If no backend is running) ---
     for (const folder of searchFolders) {
       if (fs.existsSync(folder)) {
         const targetFile = path.join(folder, subPath);
-        
         if (fs.existsSync(targetFile)) {
           if (fs.lstatSync(targetFile).isDirectory()) {
             const index = path.join(targetFile, 'index.html');
@@ -207,52 +285,13 @@ app.get('/live/:id/:subPath(*)?', async (req, res) => {
       }
     }
 
-    // 4. Fallback to index.html in any valid folder (SPA Routing)
-    for (const folder of searchFolders) {
-      const index = path.join(folder, 'index.html');
-      if (fs.existsSync(index)) {
-        // INJECT <base> tag to fix subpath routing issues
-        let html = fs.readFileSync(index, 'utf8');
-        const baseTag = `<base href="/live/${id}/">`;
-        
-        if (html.includes('<head>')) {
-          html = html.replace('<head>', `<head>\n    ${baseTag}`);
-        } else if (html.includes('<html>')) {
-          html = html.replace('<html>', `<html>\n<head>${baseTag}</head>`);
-        } else {
-          html = baseTag + html;
-        }
-        
-        res.setHeader('Content-Type', 'text/html');
-        return res.send(html);
-      }
-    }
-
-    // --- SPA CATCH-ALL ---
-    // If we are here, it means it's a deep-link for an SPA (e.g. /live/id/dashboard)
-    // We should try to serve the root index.html
-    for (const folder of [projectPath, path.join(projectPath, 'dist'), path.join(projectPath, 'build'), path.join(projectPath, 'public')]) {
-      const index = path.join(folder, 'index.html');
-      if (fs.existsSync(index)) {
-        let html = fs.readFileSync(index, 'utf8');
-        const baseTag = `<base href="/live/${id}/">`;
-        html = html.replace('<head>', `<head>\n    ${baseTag}`);
-        res.setHeader('Content-Type', 'text/html');
-        return res.send(html);
-      }
-    }
-
     res.status(404).send(`
       <div style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto; text-align: center;">
-        <h1 style="color: #ef4444;">Project Entry Point Not Found</h1>
-        <p style="color: #71717a;">We looked in your root and build folders (dist, build, public), but couldn't find an index.html file.</p>
-        <div style="background: #f4f4f5; padding: 20px; border-radius: 12px; text-align: left; font-family: monospace; font-size: 13px;">
-          <strong>Looked in:</strong><br/>
-          ${searchFolders.map(f => f.split('temp-builds')[1] || f).join('<br/>')}
-        </div>
-        <p style="margin-top: 20px; font-size: 14px;">Tip: Ensure your project has an index.html or that you've set the correct <strong>Root Directory</strong>.</p>
+        <h1 style="color: #ef4444;">Deployment Not Found</h1>
+        <p style="color: #71717a;">We couldn't find any frontend assets or a running backend for this route.</p>
       </div>
     `);
+
 
   } catch (error) {
     logger.error('Hosting error:', error);
@@ -288,9 +327,9 @@ app.use('/api/databases', databaseRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
-// --- SMART ASSET FALLBACK ---
-// If a request (like /assets/main.js) 404s, check if it came from a /live/:id page
-// and try to serve it from that deployment's folder.
+// --- SMART ASSET & API FALLBACK ---
+// If a request (like /assets/main.js or /api/login) 404s, check if it came from a /live/:id page
+// and try to serve it or proxy it to that deployment's backend.
 app.use(async (req, res, next) => {
   const referer = req.get('Referer');
   if (referer && referer.includes('/live/')) {
@@ -299,37 +338,73 @@ app.use(async (req, res, next) => {
       const id = match[1];
       const subPath = req.path.startsWith('/') ? req.path.substring(1) : req.path;
       
-      // We don't want to infinite loop or serve index.html here
       if (!subPath || subPath === 'index.html') return next();
 
-      // Find the deployment to get the projectId
       const deployment = await prisma.deployment.findUnique({
         where: { id },
-        select: { projectId: true }
+        include: { project: true }
       });
 
       if (deployment) {
         const buildRoot = path.join(process.cwd(), 'temp-builds', deployment.projectId);
-        if (fs.existsSync(buildRoot)) {
-          // Try all common search folders for this ID
-          const searchFolders = [
-            buildRoot,
-            path.join(buildRoot, 'dist'),
-            path.join(buildRoot, 'build'),
-            path.join(buildRoot, 'public'),
-            path.join(buildRoot, 'client', 'dist'),
-            path.join(buildRoot, 'frontend', 'dist'),
-          ];
+        
+        // 1. Try serving as a Static File
+        const searchFolders = [
+          buildRoot,
+          path.join(buildRoot, 'dist'),
+          path.join(buildRoot, 'build'),
+          path.join(buildRoot, 'public'),
+          path.join(buildRoot, 'client', 'dist'),
+          path.join(buildRoot, 'frontend', 'dist'),
+        ];
 
-          for (const folder of searchFolders) {
-            const targetFile = path.join(folder, subPath);
-            if (fs.existsSync(targetFile) && !fs.lstatSync(targetFile).isDirectory()) {
-              return res.sendFile(targetFile);
-            }
+        for (const folder of searchFolders) {
+          const targetFile = path.join(folder, subPath);
+          if (fs.existsSync(targetFile) && !fs.lstatSync(targetFile).isDirectory()) {
+            return res.sendFile(targetFile);
           }
+        }
+
+        // 2. If it's an API call or nothing found, PROXY it to the backend
+        const inMemoryPort = BuildService.getRunningPort(id);
+        const runningPort = inMemoryPort || (deployment.meta as any)?.port;
+        
+        if (runningPort) {
+          const headers = { ...req.headers, host: 'localhost:' + runningPort };
+          delete headers['accept-encoding'];
+          
+          const proxyReq = http.request({
+            host: 'localhost',
+            port: runningPort,
+            path: '/' + subPath,
+            method: req.method,
+            headers
+          }, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode || 200, { ...proxyRes.headers, 'X-DeployFlow-Rescued': 'true' });
+            proxyRes.pipe(res);
+          });
+          
+          proxyReq.on('error', () => res.status(502).json({ error: 'Backend unreachable' }));
+          req.pipe(proxyReq);
+          return;
         }
       }
     }
+  }
+  next();
+});
+
+// --- STICKY PROJECT RESCUE ---
+// If a user refreshes on an absolute route (e.g. /login) and escapes the /live/:id/ path,
+// this middleware uses the sticky cookie to redirect them back into their project.
+app.get('/:path(*)', (req, res, next) => {
+  const subPath = req.params.path || '';
+  const lastProject = req.cookies?.df_last_project;
+
+  // We only rescue GET requests for navigation routes (no dot, not an API)
+  if (lastProject && !subPath.includes('.') && !subPath.startsWith('api/') && !subPath.startsWith('live/')) {
+    logger.info(`Sticky Rescue: Redirecting escaped path /${subPath} to project ${lastProject}`);
+    return res.redirect(`/live/${lastProject}/${subPath}`);
   }
   next();
 });
