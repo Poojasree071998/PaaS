@@ -8,7 +8,6 @@ export const errorHandler: ErrorRequestHandler = (
   res,
   next
 ) => {
-  console.log('Error caught by global handler:', err);
   let statusCode = 500;
   let code = 'INTERNAL_SERVER_ERROR';
   let message = 'An unexpected error occurred';
