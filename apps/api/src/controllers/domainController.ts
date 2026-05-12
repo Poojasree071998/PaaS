@@ -38,7 +38,13 @@ export const addDomain = async (req: Request, res: Response, next: NextFunction)
     });
 
     res.status(201).json({ success: true, data: domainWithProject });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ 
+        success: false, 
+        error: { message: 'This domain is already registered to another project.' } 
+      });
+    }
     next(error);
   }
 };
@@ -63,19 +69,20 @@ export const verifyDomain = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
-export const provisionSSL = async (req: Request, res: Response, next: NextFunction) => {
+export const setPrimaryDomain = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // mock for now
-    res.json({ success: true, message: 'SSL provisioning triggered (mock)' });
+    res.json({ success: true, message: 'Primary domain set (mock)' });
   } catch (error) {
     next(error);
   }
 };
 
-export const setPrimaryDomain = async (req: Request, res: Response, next: NextFunction) => {
+export const provisionSSL = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // mock for now
-    res.json({ success: true, message: 'Primary domain set (mock)' });
+    const { domainId } = req.params;
+    const success = await DomainService.provisionSSL(domainId);
+    res.json({ success });
   } catch (error) {
     next(error);
   }

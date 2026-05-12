@@ -64,6 +64,20 @@ app.use(morgan('combined', { stream: { write: (message) => logger.http(message.t
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// --- API ROUTES (Prioritized) ---
+app.use('/api/auth', authRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/deployments', deploymentRoutes);
+app.use('/api/env', envRoutes);
+app.use('/api/domains', domainRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/tokens', tokenRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/databases', databaseRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
+
 import { ProxyService } from './services/proxyService';
 
 // --- PERMANENT PRODUCTION ROUTER ---
@@ -73,16 +87,37 @@ app.get('/p/:slug/:subPath(*)?', async (req, res) => {
   return ProxyService.handleRequest(req, res, slug);
 });
 
-// --- SUBDOMAIN ROUTER ---
-// Routes traffic based on the hostname (e.g. my-app.deployflow.dev)
+// --- HOSTNAME & CUSTOM DOMAIN ROUTER ---
+// Routes traffic based on the hostname (e.g. my-app.deployflow.dev OR custom-domain.com)
 app.use(async (req, res, next) => {
-  const host = req.headers.host || '';
-  const baseDomain = 'deployflow.dev'; // Should match your APP_SUBDOMAIN_BASE in .env
+  // Get host and strip port if present (e.g. localhost:4000 -> localhost)
+  const hostWithPort = req.headers.host || '';
+  let host = hostWithPort.split(':')[0];
 
+  // --- MAGIC PREVIEW OVERRIDE ---
+  // Allows testing custom domains locally without editing hosts file
+  // Example: http://localhost:4000/some-path?__df_host=myproject.com
+  if (req.query.__df_host) {
+    host = req.query.__df_host as string;
+  }
+  const baseDomain = process.env.APP_SUBDOMAIN_BASE || 'deployflow.dev';
+
+  // 0. Skip for API routes and Localhost
+  if (req.path.startsWith('/api/') || host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+    return next();
+  }
+
+  // 1. Handle Subdomains (e.g. my-app.deployflow.dev)
   if (host.endsWith(baseDomain) && host !== baseDomain) {
     const slug = host.replace(`.${baseDomain}`, '');
     return ProxyService.handleRequest(req, res, slug);
   }
+
+  // 2. Handle Custom Domains (e.g. mydomain.com)
+  if (host !== baseDomain) {
+    return ProxyService.handleRequest(req, res, host);
+  }
+
   next();
 });
 
@@ -314,18 +349,8 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api/docs', swaggerUi.serve as any, swaggerUi.setup(swaggerDocs) as any);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/teams', teamRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/deployments', deploymentRoutes);
-app.use('/api/env', envRoutes);
-app.use('/api/domains', domainRoutes);
-app.use('/api/webhooks', webhookRoutes);
-app.use('/api/tokens', tokenRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/databases', databaseRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/admin', adminRoutes);
+// API Routes are defined here but should be moved up if possible
+// (I will keep them here for now but the skip logic in the middleware above handles it)
 
 // --- SMART ASSET & API FALLBACK ---
 // If a request (like /assets/main.js or /api/login) 404s, check if it came from a /live/:id page

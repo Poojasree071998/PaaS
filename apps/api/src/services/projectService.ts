@@ -45,7 +45,10 @@ export class ProjectService {
 
     if (!project) throw new NotFoundError('Project not found');
 
-    // Check if user is member of the team
+    // 1. Allow access if user is the direct creator
+    if (project.userId === userId) return project;
+
+    // 2. Check if user is member of the team
     const member = await prisma.teamMember.findFirst({
       where: { teamId: project.teamId, userId, inviteAccepted: true }
     });
@@ -55,16 +58,42 @@ export class ProjectService {
     return project;
   }
 
-  static async listProjects(teamId: string, userId: string) {
-    // Check access
-    const member = await prisma.teamMember.findFirst({
-      where: { teamId, userId, inviteAccepted: true }
-    });
+  static async listProjects(teamId: string | undefined, userId: string) {
+    if (teamId) {
+      // Check access for specific team
+      const member = await prisma.teamMember.findFirst({
+        where: { teamId, userId, inviteAccepted: true }
+      });
 
-    if (!member) throw new ForbiddenError('You do not have access to this team');
+      if (!member) throw new ForbiddenError('You do not have access to this team');
 
+      return prisma.project.findMany({
+        where: { teamId },
+        include: { 
+          _count: { select: { deployments: true, domains: true } },
+          deployments: {
+            where: { status: 'READY' },
+            orderBy: { readyAt: 'desc' },
+            take: 1
+          }
+        }
+      });
+    }
+
+    // List all projects user has access to (direct ownership or team membership)
     return prisma.project.findMany({
-      where: { teamId },
+      where: {
+        OR: [
+          { userId },
+          { 
+            team: {
+              members: {
+                some: { userId, inviteAccepted: true }
+              }
+            }
+          }
+        ]
+      },
       include: { 
         _count: { select: { deployments: true, domains: true } },
         deployments: {

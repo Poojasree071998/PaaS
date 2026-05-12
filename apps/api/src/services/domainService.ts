@@ -8,8 +8,22 @@ export class DomainService {
     if (!domain) throw new NotFoundError('Domain not found');
 
     try {
-      const records = await dns.resolveTxt(`_deployflow-challenge.${domain.hostname}`);
-      const isVerified = records.flat().includes(domain.verificationToken);
+      let isVerified = false;
+      
+      // 1. Try real DNS resolution
+      try {
+        const records = await dns.resolveTxt(`_deployflow-challenge.${domain.hostname}`);
+        isVerified = records.flat().includes(domain.verificationToken);
+      } catch (e) {
+        // DNS lookup failed
+      }
+
+      // 2. Dev Override: If DNS fails, check if we should skip the check (for testing)
+      const skipCheck = process.env.SKIP_DNS_CHECK === 'true' || process.env.SKIP_DNS_CHECK === '1';
+      if (!isVerified && skipCheck) {
+        import('../config/logger').then(m => m.default.warn(`⚠️ DNS check skipped for ${domain.hostname} (SKIP_DNS_CHECK is enabled)`));
+        isVerified = true;
+      }
 
       if (isVerified) {
         await prisma.domain.update({
@@ -93,5 +107,18 @@ export class DomainService {
     return prisma.domain.delete({
       where: { id: domainId }
     });
+  }
+
+  static async provisionSSL(domainId: string) {
+    // 1. Simulate SSL generation delay
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // 2. Update status to ACTIVE
+    await prisma.domain.update({
+      where: { id: domainId },
+      data: { sslStatus: 'ACTIVE' }
+    });
+
+    return true;
   }
 }

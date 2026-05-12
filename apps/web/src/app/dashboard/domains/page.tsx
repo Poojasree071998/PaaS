@@ -13,7 +13,9 @@ import {
   Loader2,
   Trash2,
   X,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ShieldCheck
 } from 'lucide-react';
 import { getApiUrl } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
@@ -33,6 +35,9 @@ export default function DomainsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [provisioningId, setProvisioningId] = useState<string | null>(null);
+  const [selectedDomainForDns, setSelectedDomainForDns] = useState<any | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -81,7 +86,7 @@ export default function DomainsPage() {
         setIsAddModalOpen(false);
         setNewHostname('');
       } else {
-        alert(data.message || 'Failed to add domain');
+        alert(data.error?.message || 'Failed to add domain');
       }
     } catch (error) {
       alert('Error adding domain');
@@ -108,6 +113,47 @@ export default function DomainsPage() {
       alert('Error deleting domain');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleVerify = async (domainId: string) => {
+    setVerifyingId(domainId);
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/domains/${domainId}/verify`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success && data.verified) {
+        setDomains(domains.map(d => d.id === domainId ? { ...d, verified: true } : d));
+        setSelectedDomainForDns(null);
+      } else {
+        alert('DNS verification failed. Please ensure records are set correctly.');
+      }
+    } catch (error) {
+      alert('Error verifying domain');
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const handleProvisionSSL = async (domainId: string) => {
+    setProvisioningId(domainId);
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/domains/${domainId}/ssl`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDomains(domains.map(d => d.id === domainId ? { ...d, sslStatus: 'ACTIVE' } : d));
+      } else {
+        alert('Failed to provision SSL certificate.');
+      }
+    } catch (error) {
+      alert('Error provisioning SSL');
+    } finally {
+      setProvisioningId(null);
     }
   };
 
@@ -206,10 +252,18 @@ export default function DomainsPage() {
                             <span className="text-sm text-emerald-500">Active</span>
                           </>
                         ) : (
-                          <>
-                            <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-sm text-amber-500">Pending</span>
-                          </>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                              <span className="text-sm text-amber-500">Pending</span>
+                            </div>
+                            <button 
+                              onClick={() => setSelectedDomainForDns(domain)}
+                              className="text-[10px] text-blue-400 hover:underline text-left font-bold uppercase tracking-tighter"
+                            >
+                              View DNS Settings
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -221,11 +275,36 @@ export default function DomainsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {domain.verified && domain.sslStatus !== 'ACTIVE' && (
+                          <button 
+                            onClick={() => handleProvisionSSL(domain.id)}
+                            disabled={provisioningId === domain.id}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg text-xs font-bold transition-all border border-blue-500/20 group-hover:scale-105 active:scale-95"
+                          >
+                            {provisioningId === domain.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="w-3 h-3" />
+                            )}
+                            Provision SSL
+                          </button>
+                        )}
+                        <a 
+                          href={`http://localhost:4000?__df_host=${domain.hostname}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-bold transition-all border border-emerald-500/20 group-hover:scale-105 active:scale-95"
+                          title="Test this domain locally"
+                        >
+                          <Globe className="w-3 h-3" />
+                          Local Preview
+                        </a>
                         <a 
                           href={`https://${domain.hostname}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white"
+                          title="Visit live domain"
                         >
                           <ExternalLink className="w-4 h-4" />
                         </a>
@@ -275,13 +354,15 @@ export default function DomainsPage() {
                   <select 
                     value={selectedProjectId}
                     onChange={(e) => setSelectedProjectId(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-white/20 transition-all text-white appearance-none cursor-pointer font-medium"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-white/20 transition-all text-white appearance-none cursor-pointer font-medium hover:bg-white/10"
                   >
                     {projects.map(p => (
-                      <option key={p.id} value={p.id} className="bg-zinc-900">{p.name}</option>
+                      <option key={p.id} value={p.id} className="bg-[#18181b] text-white">
+                        {p.name}
+                      </option>
                     ))}
                   </select>
-                  <MoreVertical className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none rotate-90" />
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none transition-transform group-focus-within:rotate-180" />
                 </div>
               </div>
 
@@ -344,6 +425,88 @@ export default function DomainsPage() {
                   Remove
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DNS Instructions Modal */}
+      {selectedDomainForDns && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-zinc-950 border border-white/10 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
+            <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+              <div>
+                <h2 className="text-2xl font-bold text-white">DNS Configuration</h2>
+                <p className="text-zinc-500 text-sm mt-1">Configure your domain to point to DeployFlow</p>
+              </div>
+              <button onClick={() => setSelectedDomainForDns(null)} className="p-2 hover:bg-white/5 rounded-full text-zinc-500 hover:text-white transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="space-y-4">
+                <p className="text-sm text-zinc-400">Add the following records to your DNS provider (Cloudflare, GoDaddy, etc.) to verify ownership and route traffic.</p>
+                
+                <div className="space-y-3">
+                  <div className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-zinc-600 tracking-widest">TXT Record (Verification)</span>
+                      <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full font-bold">Required</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm font-mono">
+                      <div className="col-span-1 text-zinc-500">Host</div>
+                      <div className="col-span-2 text-white">_deployflow-challenge</div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm font-mono">
+                      <div className="col-span-1 text-zinc-500">Value</div>
+                      <div className="col-span-2 text-blue-400 break-all">{selectedDomainForDns.verificationToken}</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-zinc-600 tracking-widest">A Record (Traffic)</span>
+                      <span className="text-[10px] bg-white/10 text-zinc-500 px-2 py-0.5 rounded-full font-bold">Recommended</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm font-mono">
+                      <div className="col-span-1 text-zinc-500">Host</div>
+                      <div className="col-span-2 text-white">@</div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm font-mono">
+                      <div className="col-span-1 text-zinc-500">Value</div>
+                      <div className="col-span-2 text-white">76.76.21.21 <span className="text-[10px] text-zinc-600 font-sans italic ml-2">(DeployFlow IP)</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => handleVerify(selectedDomainForDns.id)}
+                  disabled={verifyingId === selectedDomainForDns.id}
+                  className="flex-[2] bg-white text-black font-bold py-4 rounded-2xl hover:bg-zinc-200 transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                >
+                  {verifyingId === selectedDomainForDns.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Shield className="w-5 h-5" />
+                      Verify DNS Records
+                    </>
+                  )}
+                </button>
+                <button 
+                  onClick={() => setSelectedDomainForDns(null)}
+                  className="flex-1 border border-white/10 font-bold py-4 rounded-2xl hover:bg-white/5 transition-all text-zinc-400 hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
+
+              <p className="text-center text-[10px] text-zinc-600 uppercase font-bold tracking-widest">
+                DNS propagation can take up to 24 hours but usually takes a few minutes.
+              </p>
             </div>
           </div>
         </div>

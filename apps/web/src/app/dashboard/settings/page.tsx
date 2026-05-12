@@ -137,10 +137,12 @@ export default function SettingsPage() {
           <select 
             value={selectedProjectId}
             onChange={(e) => handleProjectChange(e.target.value)}
-            className="appearance-none bg-white/5 border border-white/10 rounded-lg px-4 py-2 pr-10 outline-none hover:bg-white/10 transition-all cursor-pointer text-sm font-semibold"
+            className="appearance-none bg-white/5 border border-white/10 rounded-lg px-4 py-2 pr-10 outline-none hover:bg-white/10 transition-all cursor-pointer text-sm font-semibold text-white"
           >
             {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id} className="bg-[#18181b] text-white">
+                {p.name}
+              </option>
             ))}
           </select>
           <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
