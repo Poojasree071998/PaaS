@@ -148,7 +148,6 @@ app.all('/live/:id/:subPath(*)?', async (req, res) => {
 
     // 3. Define all possible build output folders
     const searchFolders = [
-      projectPath,
       path.join(projectPath, 'dist'),
       path.join(projectPath, 'build'),
       path.join(projectPath, 'public'),
@@ -159,6 +158,7 @@ app.all('/live/:id/:subPath(*)?', async (req, res) => {
       path.join(projectPath, 'frontend', 'build'),
       path.join(projectPath, 'web', 'dist'),
       path.join(projectPath, 'apps', 'web', 'dist'),
+      projectPath,
     ];
 
     const runningPort = inMemoryPort || (deployment.meta as any)?.port;
@@ -350,12 +350,12 @@ app.use(async (req, res, next) => {
         
         // 1. Try serving as a Static File
         const searchFolders = [
-          buildRoot,
           path.join(buildRoot, 'dist'),
           path.join(buildRoot, 'build'),
           path.join(buildRoot, 'public'),
           path.join(buildRoot, 'client', 'dist'),
           path.join(buildRoot, 'frontend', 'dist'),
+          buildRoot,
         ];
 
         for (const folder of searchFolders) {
