@@ -6,13 +6,18 @@ const router = Router();
 
 router.use(authenticate);
 
+// Global domain management
+router.get('/', domainController.listAllDomains);
+
+// Project-specific domain management
 router.get('/:projectId', domainController.listDomains);
 router.post('/:projectId', domainController.addDomain);
-router.delete('/:projectId/:domainId', domainController.removeDomain);
 
-router.post('/:projectId/:domainId/verify', domainController.verifyDomain);
-router.post('/:projectId/:domainId/ssl', domainController.provisionSSL);
-router.patch('/:projectId/:domainId/primary', domainController.setPrimaryDomain);
-router.post('/:projectId/:domainId/redirect', domainController.configureRedirect);
+// Specific domain actions
+router.delete('/:domainId', domainController.removeDomain);
+router.post('/:domainId/verify', domainController.verifyDomain);
+router.post('/:domainId/ssl', domainController.provisionSSL);
+router.patch('/:domainId/primary', domainController.setPrimaryDomain);
+router.post('/:domainId/redirect', domainController.configureRedirect);
 
 export default router;

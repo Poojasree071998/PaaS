@@ -38,4 +38,60 @@ export class DomainService {
       }
     });
   }
+
+  static async listAllDomains(userId: string) {
+    return prisma.domain.findMany({
+      where: {
+        project: {
+          userId: userId
+        }
+      },
+      include: {
+        project: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+
+  static async listDomainsByProject(projectId: string, userId: string) {
+    return prisma.domain.findMany({
+      where: {
+        projectId,
+        project: {
+          userId
+        }
+      },
+      include: {
+        project: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+  }
+
+  static async removeDomain(domainId: string, userId: string) {
+    // Ensure the domain belongs to a project owned by the user
+    const domain = await prisma.domain.findFirst({
+      where: {
+        id: domainId,
+        project: {
+          userId
+        }
+      }
+    });
+
+    if (!domain) throw new NotFoundError('Domain not found or unauthorized');
+
+    return prisma.domain.delete({
+      where: { id: domainId }
+    });
+  }
 }
