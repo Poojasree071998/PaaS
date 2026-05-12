@@ -354,6 +354,17 @@ export class BuildService {
   static getRunningPort(id: string) { return runningProcesses.get(id)?.port; }
   static async stopProcess(id: string) { const p = runningProcesses.get(id); if (p) { p.process.kill('SIGKILL'); runningProcesses.delete(id); } }
 
+  /**
+   * Ensures that a specific deployment process is running.
+   * If not, it triggers a recovery start.
+   */
+  static async ensureRunning(deploymentId: string) {
+    if (!this.isProcessRunning(deploymentId)) {
+      logger.info(`Ensuring deployment ${deploymentId} is running...`);
+      return this.runBuild(deploymentId);
+    }
+  }
+
   private static async findAvailablePort(): Promise<number> {
     const usedPorts = Array.from(runningProcesses.values()).map(p => p.port);
     let port = 10000;
