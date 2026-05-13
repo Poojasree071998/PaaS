@@ -4,52 +4,53 @@ import config from '../config';
 import logger from '../config/logger';
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+const redisUrl = config.REDIS_URL;
 
-// Only default to localhost in development
-const redisUrl = config.REDIS_URL || (isProduction ? null : 'redis://localhost:6379');
-
-if (isProduction && !config.REDIS_URL) {
-  logger.warn('⚠️ REDIS_URL is not defined. Background tasks will be disabled to avoid connection errors.');
+// Stub for Queue when Redis is missing
+class QueueStub {
+  constructor(public name: string) {}
+  async add() { logger.warn(`Queue.${this.name}.add called but Redis is offline.`); return null; }
+  async getJob() { return null; }
+  on() { return this; }
 }
 
-// Instantiate connection with lazyConnect if no URL is provided to prevent immediate connection attempts
-const connection = new IORedis(redisUrl as any, {
-  maxRetriesPerRequest: null,
-  connectTimeout: 10000,
-  lazyConnect: !redisUrl, // Don't even try to connect if we don't have a URL
-  tls: config.REDIS_URL?.startsWith('rediss://') ? {
-    rejectUnauthorized: false
-  } : undefined,
-  retryStrategy: (times) => {
-    // If no URL, stop retrying immediately in production
-    if (!redisUrl && isProduction) return null;
-    // Otherwise, use a very conservative retry strategy
-    return Math.min(times * 2000, 60000); 
-  },
-  reconnectOnError: (err) => {
-    const targetError = 'READONLY';
-    if (err.message.includes(targetError)) return true;
-    return false;
-  }
-});
+let connection: any;
+let buildQueue: any;
+let deployQueue: any;
+let sslQueue: any;
+let notifyQueue: any;
 
-let lastWarnTime = 0;
-connection.on('error', (err) => {
-  // Only log if we actually have a URL or if it's development
-  if (redisUrl || !isProduction) {
-    const now = Date.now();
-    if (now - lastWarnTime > 300000) { // Log once every 5 minutes
-      logger.warn('📡 Redis connection failed. Background features will be limited.');
-      lastWarnTime = now;
+if (isProduction && !redisUrl) {
+  logger.warn('⚠️ REDIS_URL is missing. Background tasks are DISABLED.');
+  // Use stubs to prevent crashes
+  connection = { on: () => {}, quit: async () => {} };
+  buildQueue = new QueueStub('build');
+  deployQueue = new QueueStub('deploy');
+  sslQueue = new QueueStub('ssl');
+  notifyQueue = new QueueStub('notify');
+} else {
+  // Only connect if we have a URL or we are in development
+  const finalUrl = redisUrl || 'redis://localhost:6379';
+  
+  connection = new IORedis(finalUrl, {
+    maxRetriesPerRequest: null,
+    connectTimeout: 5000,
+    tls: finalUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+    retryStrategy: (times) => {
+      if (times > 3 && !redisUrl) return null; // Give up quickly if no URL provided
+      return Math.min(times * 1000, 15000);
     }
-  }
-});
+  });
 
-export const buildQueue = new Queue('build', { connection });
-export const deployQueue = new Queue('deploy', { connection });
-export const sslQueue = new Queue('ssl', { connection });
-export const notifyQueue = new Queue('notify', { connection });
+  // Catch errors immediately to prevent process crashes
+  connection.on('error', () => {}); 
 
-logger.info(`🐎 BullMQ Queues initialized ${!redisUrl ? '(OFFLINE MODE - No REDIS_URL found)' : '(CONNECTED)'}`);
+  buildQueue = new Queue('build', { connection });
+  deployQueue = new Queue('deploy', { connection });
+  sslQueue = new Queue('ssl', { connection });
+  notifyQueue = new Queue('notify', { connection });
 
-export { connection };
+  logger.info(`🐎 BullMQ Queues initialized (${redisUrl ? 'Connected' : 'Dev Mode'})`);
+}
+
+export { connection, buildQueue, deployQueue, sslQueue, notifyQueue };
