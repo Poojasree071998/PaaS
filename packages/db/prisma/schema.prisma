@@ -234,6 +234,7 @@ model Deployment {
   user            User                  @relation(fields: [userId], references: [id])
   
   logs            BuildLog[]
+  domains         Domain[]
   
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
@@ -254,6 +255,7 @@ model Domain {
   id                String    @id @default(cuid())
   projectId         String
   teamId            String
+  deploymentId      String?   // Added to pin domain to a specific deployment
   hostname          String    @unique
   verified          Boolean   @default(false)
   verificationToken String
@@ -264,6 +266,7 @@ model Domain {
   
   project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   team              Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  deployment        Deployment? @relation(fields: [deploymentId], references: [id])
   
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

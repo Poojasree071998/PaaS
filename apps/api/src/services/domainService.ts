@@ -38,13 +38,14 @@ export class DomainService {
     }
   }
 
-  static async addDomain(projectId: string, teamId: string, hostname: string) {
+  static async addDomain(projectId: string, teamId: string, hostname: string, deploymentId?: string) {
     const verificationToken = `df_${Math.random().toString(36).substring(2, 15)}`;
     
-    return prisma.domain.create({
+    return (prisma.domain as any).create({
       data: {
         projectId,
         teamId,
+        deploymentId,
         hostname,
         verificationToken,
         verified: false,

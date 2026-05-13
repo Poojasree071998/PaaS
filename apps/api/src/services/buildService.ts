@@ -269,9 +269,18 @@ export class BuildService {
         await this.log(deploymentId, `[3/4] 🔨 Building project...`, LogLevel.INFO);
         let bCmd = deployment.project.buildCommand || 'npm run build';
         
+        // --- DYNAMIC BASE PATH INJECTION ---
+        // Ensures that assets are requested with the correct /live/:id/ prefix
+        const basePath = `/live/${deploymentId}/`;
+        
         if (bCmd.includes('vite build') || bCmd === 'npm run build') {
-          bCmd += ` -- --base=${livePath}`;
+          bCmd += ` -- --base=${basePath}`;
         }
+
+        env.VITE_BASE_URL = basePath;
+        env.BASE_URL = basePath;
+        env.PUBLIC_URL = basePath;
+        env.VITE_BASE_PATH = basePath;
 
         try {
           await this.executeLiveCommand(deploymentId, bCmd, [], workingDir, env, 1200000);

@@ -24,12 +24,12 @@ export const listDomains = async (req: Request, res: Response, next: NextFunctio
 export const addDomain = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { projectId } = req.params;
-    const { hostname } = req.body;
+    const { hostname, deploymentId } = req.body;
 
     // Verify project belongs to user
     const project = await ProjectService.getProject(projectId, req.user!.id);
     
-    const domain = await DomainService.addDomain(projectId, project.teamId, hostname);
+    const domain = await DomainService.addDomain(projectId, project.teamId, hostname, deploymentId);
     
     // Fetch with project include for frontend
     const domainWithProject = await prisma.domain.findUnique({
