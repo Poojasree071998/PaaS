@@ -3,12 +3,18 @@ import IORedis from 'ioredis';
 import config from '../config';
 import logger from '../config/logger';
 
-const connection = new IORedis(config.REDIS_URL, {
+// Handle missing Redis connection gracefully
+const redisUrl: string = config.REDIS_URL || 'redis://localhost:6379';
+if (!config.REDIS_URL) {
+  logger.warn('⚠️ REDIS_URL is not defined. Background workers will not function correctly.');
+}
+
+const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
   connectTimeout: 10000,
-  tls: {
+  tls: config.REDIS_URL?.startsWith('rediss://') ? {
     rejectUnauthorized: false
-  },
+  } : undefined,
   retryStrategy: (times) => Math.min(times * 100, 3000),
   reconnectOnError: (err) => {
     const targetError = 'READONLY';

@@ -56,11 +56,17 @@ if (!parsed.success) {
     }
   });
   
-  if (isProduction) {
-    console.error('\n💡 TIP: Ensure you have set these variables in your Render/Deployment dashboard.');
-  }
-  
   process.exit(1);
+}
+
+// Validation warnings for critical missing variables in production
+if (isProduction) {
+  if (!parsed.data.DATABASE_URL) {
+    console.warn('⚠️ WARNING: DATABASE_URL is missing. Database features will be unavailable.');
+  }
+  if (!parsed.data.REDIS_URL) {
+    console.warn('⚠️ WARNING: REDIS_URL is missing. Background queues and real-time updates will be unavailable.');
+  }
 }
 
 // Manually set defaults for libraries that read directly from process.env (like Prisma)

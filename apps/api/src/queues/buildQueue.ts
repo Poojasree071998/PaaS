@@ -2,7 +2,8 @@ import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { io, prisma } from '../index';
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+const redisUrl: string = process.env.REDIS_URL || 'redis://localhost:6379';
+const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
