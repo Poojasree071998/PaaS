@@ -1,7 +1,9 @@
 export const getApiUrl = () => {
-  // Use relative path for Netlify Proxy
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return window.location.origin;
+    // If we are on Vercel, we MUST point to the actual backend on Render
+    return 'https://paas-k7nx.onrender.com';
   }
 
   // Handle local development
@@ -13,5 +15,6 @@ export const getSocketUrl = () => {
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
     return 'http://localhost:4000';
   }
-  return 'https://deployflow-api.onrender.com';
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  return 'https://paas-k7nx.onrender.com';
 };
