@@ -22,9 +22,9 @@
     "seed": "npm run prisma:seed --workspace=api"
   },
   "devDependencies": {
-    "@prisma/client": "^5.12.1",
+    "@prisma/client": "^5.22.0",
     "prettier": "^3.0.0",
-    "prisma": "^5.12.1",
+    "prisma": "^5.22.0",
     "turbo": "latest",
     "typescript": "^5.0.0"
   },

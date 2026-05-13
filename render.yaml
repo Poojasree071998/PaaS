@@ -3,8 +3,8 @@ services:
     name: deployflow-api
     env: node
     plan: free
-    buildCommand: npm install && npm run db:generate && npm run db:push && npm run build -w api
-    startCommand: npm run start -w api
+    buildCommand: npm install && npm run db:generate && npm run build -w api
+    startCommand: npm run db:push && npm run start -w api
     envVars:
       - key: NODE_ENV
         value: production

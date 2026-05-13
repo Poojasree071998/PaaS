@@ -8,7 +8,8 @@ const TAG_LENGTH = 16;
 export class CryptoUtils {
   static encrypt(text: string): string {
     const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(config.ENCRYPTION_MASTER_KEY), iv);
+    const key = crypto.createHash('sha256').update(config.ENCRYPTION_MASTER_KEY).digest();
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
     
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -23,7 +24,8 @@ export class CryptoUtils {
     
     const iv = Buffer.from(ivHex, 'hex');
     const tag = Buffer.from(tagHex, 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(config.ENCRYPTION_MASTER_KEY), iv);
+    const key = crypto.createHash('sha256').update(config.ENCRYPTION_MASTER_KEY).digest();
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     
     decipher.setAuthTag(tag);
     
