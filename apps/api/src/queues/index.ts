@@ -15,7 +15,11 @@ const connection = new IORedis(redisUrl, {
   tls: config.REDIS_URL?.startsWith('rediss://') ? {
     rejectUnauthorized: false
   } : undefined,
-  retryStrategy: (times) => Math.min(times * 100, 3000),
+  retryStrategy: (times) => {
+    // Stop retrying after 10 failed attempts if no URL was provided (likely misconfigured)
+    if (!config.REDIS_URL && times > 10) return null;
+    return Math.min(times * 1000, 30000); // Wait up to 30s between retries
+  },
   reconnectOnError: (err) => {
     const targetError = 'READONLY';
     if (err.message.includes(targetError)) return true;
@@ -23,8 +27,13 @@ const connection = new IORedis(redisUrl, {
   }
 });
 
+let lastWarnTime = 0;
 connection.on('error', (err) => {
-  logger.warn('📡 Redis connection failed. Some background features may be limited.');
+  const now = Date.now();
+  if (now - lastWarnTime > 60000) { // Only log once per minute
+    logger.warn('📡 Redis connection failed. Background features will be limited.');
+    lastWarnTime = now;
+  }
 });
 
 export const buildQueue = new Queue('build', { connection });

@@ -46,14 +46,23 @@ app.use(helmet({
   referrerPolicy: { policy: 'no-referrer-when-downgrade' }
 }));
 
-// Health Check (Now protected by CORS)
+// Enhanced Health Check
 app.get('/health', async (req, res) => {
+  let dbStatus = 'disconnected';
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'OK', message: 'DeployFlow API is healthy', database: 'connected' });
+    dbStatus = 'connected';
   } catch (err) {
-    res.status(500).json({ status: 'ERROR', message: 'Database disconnected' });
+    dbStatus = 'error';
   }
+
+  const status = dbStatus === 'connected' ? 'OK' : 'DEGRADED';
+  res.status(status === 'OK' ? 200 : 207).json({ 
+    status, 
+    message: status === 'OK' ? 'DeployFlow API is fully operational' : 'API is up but database is unreachable',
+    database: dbStatus,
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.use(standardRateLimiter);
@@ -156,9 +165,6 @@ app.all('/live/:id/:subPath(*)?', async (req, res) => {
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ success: true, status: 'UP' });
-});
 
 // Routes
 const swaggerOptions = {

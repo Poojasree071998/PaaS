@@ -41,8 +41,8 @@ const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER
 // Prepare raw environment with defaults
 const rawEnv = {
   ...process.env,
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/deployflow',
-  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  DATABASE_URL: process.env.DATABASE_URL || (!isProduction ? 'postgresql://postgres:postgres@localhost:5432/deployflow' : undefined),
+  REDIS_URL: process.env.REDIS_URL || (!isProduction ? 'redis://localhost:6379' : undefined),
 };
 
 const parsed = envSchema.safeParse(rawEnv);
