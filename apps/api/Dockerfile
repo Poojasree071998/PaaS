@@ -1,5 +1,5 @@
 # Build Stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,8 @@ RUN npm run prisma:generate --workspace=api
 RUN npm run build --workspace=api
 
 # Production Stage
-FROM node:20-alpine
+FROM node:20-slim
+RUN apt-get update -y && apt-get install -y openssl
 
 WORKDIR /app
 
