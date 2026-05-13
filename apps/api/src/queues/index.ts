@@ -50,6 +50,6 @@ export const deployQueue = new Queue('deploy', { connection });
 export const sslQueue = new Queue('ssl', { connection });
 export const notifyQueue = new Queue('notify', { connection });
 
-logger.info('🐎 BullMQ Queues initialized' + (!redisUrl ? ' (Offline Mode)' : ''));
+logger.info(`🐎 BullMQ Queues initialized ${!redisUrl ? '(OFFLINE MODE - No REDIS_URL found)' : '(CONNECTED)'}`);
 
 export { connection };

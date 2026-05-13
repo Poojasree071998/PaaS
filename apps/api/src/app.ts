@@ -65,6 +65,20 @@ app.get('/health', async (req, res) => {
   });
 });
 
+// Friendly Root Route
+app.get('/', (req, res) => {
+  res.send(`
+    <div style="font-family: sans-serif; padding: 40px; text-align: center; background: #09090b; color: white; height: 100vh; display: flex; flex-direction: column; justify-content: center;">
+      <h1 style="color: #3b82f6; margin-bottom: 8px;">DeployFlow PaaS API</h1>
+      <p style="color: #a1a1aa; margin-bottom: 24px;">The hosting engine is active and ready.</p>
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <a href="/health" style="padding: 8px 16px; background: #27272a; color: white; border-radius: 6px; text-decoration: none;">Check Health</a>
+        <a href="/api/docs" style="padding: 8px 16px; background: #27272a; color: white; border-radius: 6px; text-decoration: none;">API Docs</a>
+      </div>
+    </div>
+  `);
+});
+
 app.use(standardRateLimiter);
 
 // Logging
