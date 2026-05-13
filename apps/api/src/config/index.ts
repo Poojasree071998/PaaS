@@ -6,8 +6,8 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('4000'),
-  DATABASE_URL: z.string(),
-  REDIS_URL: z.string(),
+  DATABASE_URL: z.string().optional(),
+  REDIS_URL: z.string().optional(),
   
   JWT_ACCESS_SECRET: z.string().default('dev-secret-access'),
   JWT_REFRESH_SECRET: z.string().default('dev-secret-refresh'),
@@ -38,11 +38,11 @@ const envSchema = z.object({
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
 
-// Prepare raw environment with defaults for non-production environments
+// Prepare raw environment with defaults
 const rawEnv = {
   ...process.env,
-  DATABASE_URL: process.env.DATABASE_URL || (!isProduction ? 'postgresql://postgres:postgres@localhost:5432/deployflow' : undefined),
-  REDIS_URL: process.env.REDIS_URL || (!isProduction ? 'redis://localhost:6379' : undefined),
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/deployflow',
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
 };
 
 const parsed = envSchema.safeParse(rawEnv);
