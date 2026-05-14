@@ -166,7 +166,7 @@ export default function ImportProjectPage() {
           <ChevronLeft className="w-5 h-5 text-zinc-400" />
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Import Repository</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white">FIXED - Import Repository (v2.3)</h1>
           <p className="text-zinc-500">Auto-Pilot will handle your configuration automatically.</p>
         </div>
       </div>
