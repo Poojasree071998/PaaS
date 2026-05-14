@@ -24,11 +24,11 @@ export default function DeploymentsPage() {
   useEffect(() => {
     const fetchDeployments = async () => {
       try {
-        const apiUrl = getApiUrl();
+        const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-        const response = await fetch(`${apiUrl}/api/deployments`, {
+        const response = await fetch(`${API_BASE}/api/deployments`, {
           signal: controller.signal
         });
         
@@ -63,8 +63,8 @@ export default function DeploymentsPage() {
       if (!window.confirm('Are you sure you want to delete this deployment? This action cannot be undone.')) return;
       
       try {
-        const apiUrl = getApiUrl();
-        const response = await fetch(`${apiUrl}/api/deployments/${id}`, {
+        const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
+        const response = await fetch(`${API_BASE}/api/deployments/${id}`, {
           method: 'DELETE'
         });
         

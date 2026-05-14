@@ -1,7 +1,6 @@
 // Last Updated: 2026-05-14T10:59:00Z
 export const getApiUrl = () => {
-
-  const RENDER_URL = 'https://paas-k7nx.onrender.com';
+  const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
   
   if (typeof window !== 'undefined') {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -9,7 +8,7 @@ export const getApiUrl = () => {
     }
   }
   
-  return RENDER_URL;
+  return API_BASE;
 };
 
 

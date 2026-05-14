@@ -15,8 +15,8 @@ function SuccessPageContent() {
     if (!id) return;
     const fetchDetails = async () => {
       try {
-        const apiUrl = getApiUrl();
-        const response = await fetch(`${apiUrl}/api/deployments/${id}`);
+        const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
+        const response = await fetch(`${API_BASE}/api/deployments/${id}`);
         const data = await response.json();
         if (data.success) setDeployment(data.data);
       } catch (e) {
