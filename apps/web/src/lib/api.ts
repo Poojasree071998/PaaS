@@ -1,4 +1,6 @@
+// Last Updated: 2026-05-14T10:59:00Z
 export const getApiUrl = () => {
+
   const RENDER_URL = 'https://paas-k7nx.onrender.com';
   
   if (typeof window !== 'undefined') {
