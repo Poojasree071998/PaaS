@@ -61,8 +61,8 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
     const fetchData = async () => {
       try {
         const [depRes, logsRes] = await Promise.all([
-          fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}`),
-          fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}/logs`)
+          fetch(`${getApiUrl()}/api/deployments/${id}`),
+          fetch(`${getApiUrl()}/api/deployments/${id}/logs`)
         ]);
 
         
@@ -111,7 +111,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
       setStatus(newStatus);
       // If build finished, re-fetch to get the final URL and metadata
       if (newStatus === 'READY' || newStatus === 'ERROR') {
-        const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}`);
+        const res = await fetch(`${getApiUrl()}/api/deployments/${id}`);
         const data = await res.json();
         if (data.success) setDeployment(data.data);
 
@@ -184,7 +184,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                 
                 <button
                   onClick={async () => {
-                    const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}/promote`, { method: 'POST' });
+                    const res = await fetch(`${getApiUrl()}/api/deployments/${id}/promote`, { method: 'POST' });
                     const data = await res.json();
 
                     if (data.success) {
@@ -201,7 +201,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
             <button
               onClick={async () => {
                 try {
-                  const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments`, {
+                  const res = await fetch(`${getApiUrl()}/api/deployments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 

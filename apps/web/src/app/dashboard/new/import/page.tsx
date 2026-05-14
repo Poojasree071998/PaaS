@@ -53,7 +53,7 @@ export default function ImportProjectPage() {
 
   const linkDatabase = async () => {
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/databases?teamId=default`);
+      const res = await fetch(`${getApiUrl()}/api/databases?teamId=default`);
       const data = await res.json();
       if (data.success && data.data.length > 0) {
         const db = data.data[0];
@@ -80,7 +80,7 @@ export default function ImportProjectPage() {
   const analyzeUrl = async (repoUrl: string) => {
     if (!repoUrl || !repoUrl.startsWith('https://github.com/')) return;
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments/analyze`, {
+      const res = await fetch(`${getApiUrl()}/api/deployments/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl })
@@ -120,7 +120,7 @@ export default function ImportProjectPage() {
     setLoading(true);
     
     try {
-      const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`, {
+      const response = await fetch(`${getApiUrl()}/api/deployments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -138,7 +138,7 @@ export default function ImportProjectPage() {
         data = JSON.parse(text);
       } catch (e) {
         // If it's HTML, it's likely Render waking up or a 404 from Vercel (if old version)
-        const url = `https://paas-k7nx.onrender.com/api/deployments`;
+        const url = `${getApiUrl()}/api/deployments`;
         if (text.includes('<!DOCTYPE') || text.includes('<html')) {
           throw new Error(`The Render backend (${url}) is currently waking up or returned an error page. Please wait 30 seconds and try again. (Raw response was HTML)`);
         }
@@ -322,7 +322,7 @@ export default function ImportProjectPage() {
           )}
         </button>
         <div className="text-[10px] text-zinc-600 text-center mt-4 uppercase tracking-widest font-bold">
-          Version 2.4 (Hardcoded API: https://paas-k7nx.onrender.com)
+          Version 2.4 (Environment: {getApiUrl()})
         </div>
       </div>
 

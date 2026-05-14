@@ -13,9 +13,9 @@ function SuccessPageContent() {
 
   useEffect(() => {
     if (!id) return;
-    const fetchDetails = async () => {
+    const fetchDeployment = async () => {
       try {
-        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}`);
+        const response = await fetch(`${getApiUrl()}/api/deployments/${id}`);
         const data = await response.json();
         if (data.success) setDeployment(data.data);
       } catch (e) {
@@ -24,7 +24,7 @@ function SuccessPageContent() {
         setLoading(false);
       }
     };
-    fetchDetails();
+    fetchDeployment();
   }, [id]);
 
   if (loading) {

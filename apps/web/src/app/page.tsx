@@ -45,7 +45,7 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-6">
           <Link 
-            href="https://paas-k7nx.onrender.com/api/docs" 
+            href={`${getApiUrl()}/api/docs`} 
             target="_blank"
             className="text-sm text-zinc-400 hover:text-white transition-colors"
           >

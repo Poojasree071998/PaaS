@@ -22,7 +22,7 @@ export default function DashboardOverview() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`);
+        const response = await fetch(`${getApiUrl()}/api/deployments`);
         const data = await response.json();
         if (data.success) {
           const deps = data.data;

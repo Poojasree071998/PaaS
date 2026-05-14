@@ -46,8 +46,8 @@ export default function DomainsPage() {
   const fetchData = async () => {
     try {
       const [domainsRes, projectsRes] = await Promise.all([
-        fetch(`https://paas-k7nx.onrender.com/api/domains`),
-        fetch(`https://paas-k7nx.onrender.com/api/projects`)
+        fetch(`${getApiUrl()}/api/domains`),
+        fetch(`${getApiUrl()}/api/projects`)
       ]);
 
       
@@ -74,7 +74,7 @@ export default function DomainsPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/domains/${selectedProjectId}`, {
+      const res = await fetch(`${getApiUrl()}/api/domains/${selectedProjectId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hostname: newHostname })
@@ -99,7 +99,7 @@ export default function DomainsPage() {
 
     setDeleting(true);
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/domains/${deleteConfirmId}`, {
+      const res = await fetch(`${getApiUrl()}/api/domains/${deleteConfirmId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -117,7 +117,7 @@ export default function DomainsPage() {
   const handleVerify = async (domainId: string) => {
     setVerifyingId(domainId);
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/domains/${domainId}/verify`, {
+      const res = await fetch(`${getApiUrl()}/api/domains/${domainId}/verify`, {
         method: 'POST'
       });
       const data = await res.json();
@@ -137,7 +137,7 @@ export default function DomainsPage() {
   const handleProvisionSSL = async (domainId: string) => {
     setProvisioningId(domainId);
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/domains/${domainId}/ssl`, {
+      const res = await fetch(`${getApiUrl()}/api/domains/${domainId}/ssl`, {
         method: 'POST'
       });
       const data = await res.json();
@@ -286,7 +286,7 @@ export default function DomainsPage() {
                           </button>
                         )}
                         <a 
-                          href={`https://paas-k7nx.onrender.com?__df_host=${domain.hostname}`} 
+                          href={`${getApiUrl()}?__df_host=${domain.hostname}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-bold transition-all border border-emerald-500/20 group-hover:scale-105 active:scale-95"

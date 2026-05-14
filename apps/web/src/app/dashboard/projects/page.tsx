@@ -20,7 +20,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const res = await fetch(`https://paas-k7nx.onrender.com/api/projects`);
+        const res = await fetch(`${getApiUrl()}/api/projects`);
         const data = await res.json();
         if (data.success) {
           setProjects(data.data);

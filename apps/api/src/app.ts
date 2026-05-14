@@ -187,6 +187,16 @@ const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: { title: 'DeployFlow API', version: '1.0.0' },
+    servers: [
+      {
+        url: 'https://paas-k7nx.onrender.com',
+        description: 'Production Server'
+      },
+      {
+        url: 'http://localhost:4000',
+        description: 'Local Server'
+      }
+    ],
   },
   apis: ['./src/routes/*.ts'],
 };

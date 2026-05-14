@@ -24,7 +24,7 @@ export default function DeploymentsPage() {
   useEffect(() => {
     const fetchDeployments = async () => {
       try {
-        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`);
+        const response = await fetch(`${getApiUrl()}/api/deployments`);
         
         const data = await response.json();
         if (data.success) {
@@ -56,7 +56,7 @@ export default function DeploymentsPage() {
       if (!window.confirm('Are you sure you want to delete this deployment? This action cannot be undone.')) return;
       
       try {
-        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}`, {
+        const response = await fetch(`${getApiUrl()}/api/deployments/${id}`, {
           method: 'DELETE'
         });
         

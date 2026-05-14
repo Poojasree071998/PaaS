@@ -46,7 +46,7 @@ export default function SettingsPage() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/projects`);
+      const res = await fetch(`${getApiUrl()}/api/projects`);
       const data = await res.json();
       if (data.success) {
         setProjects(data.data);
@@ -64,7 +64,7 @@ export default function SettingsPage() {
 
   const fetchProjectSettings = async (id: string) => {
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/projects/${id}`);
+      const res = await fetch(`${getApiUrl()}/api/projects/${id}`);
       const data = await res.json();
       if (data.success) {
         setEnvVars(data.data.envVars || []);
@@ -97,7 +97,7 @@ export default function SettingsPage() {
     if (!selectedProjectId) return;
     setSaving(true);
     try {
-      const res = await fetch(`https://paas-k7nx.onrender.com/api/projects/${selectedProjectId}`, {
+      const res = await fetch(`${getApiUrl()}/api/projects/${selectedProjectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ envVars }),
