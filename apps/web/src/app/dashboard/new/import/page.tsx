@@ -87,7 +87,16 @@ export default function ImportProjectPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl })
       });
-      const data = await res.json();
+      
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.warn('Backend returned non-JSON for analysis:', text.substring(0, 50));
+        return;
+      }
+
       if (data.success) {
         const analysis = data.data;
         if (analysis.framework) setDetectedFramework(analysis.framework);
@@ -102,6 +111,7 @@ export default function ImportProjectPage() {
         }));
         if (vars.length > 0) setEnvVars(vars);
       }
+
     } catch (e) {
       console.warn('Auto-analysis failed:', e);
     }
@@ -124,13 +134,22 @@ export default function ImportProjectPage() {
           envVars: envVars.filter(v => v.key && v.value)
         })
       });
-      const data = await response.json();
+      
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Backend returned HTML/error page instead of JSON. This usually means the API URL or route is wrong. Response: ${text.substring(0, 100)}...`);
+      }
+
       if (data.success) {
         localStorage.removeItem('df_project_draft'); // Clear draft on success
         router.push(`/dashboard/deployments/${data.data.id}`);
       } else {
         alert(`API Error: ${data.error?.message || 'Unknown error'}`);
       }
+
     } catch (error: any) {
       alert(`Deployment failed: ${error.message}`);
     } finally {
