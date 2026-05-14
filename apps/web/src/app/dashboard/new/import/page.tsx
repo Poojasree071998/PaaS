@@ -144,8 +144,8 @@ export default function ImportProjectPage() {
           <ChevronLeft className="w-5 h-5 text-zinc-400" />
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">FIXED - Import Repository (v2.4)</h1>
-          <p className="text-zinc-500">Last Build: {new Date().toLocaleTimeString()} - Auto-Pilot Active</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Import Repository (Production Connected)</h1>
+          <p className="text-zinc-500 font-mono text-xs mt-1">API: {getApiUrl()}</p>
         </div>
       </div>
 
