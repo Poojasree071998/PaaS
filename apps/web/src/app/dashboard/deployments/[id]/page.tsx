@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import { 
