@@ -11,8 +11,10 @@ import {
   Database, 
   Activity, 
   CreditCard,
-  Plus
+  Plus,
+  LogOut
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +31,21 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('df_user');
+      if (storedUser) setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('df_token');
+    localStorage.removeItem('df_user');
+    router.push('/login');
+  };
 
   // --- AUTOMATIC WAKE-UP ENGINE ---
   // Background ping to wake up the API from Render's free-tier sleep
@@ -76,16 +93,24 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 space-y-2">
         <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors group">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-emerald-700 flex items-center justify-center text-sm font-bold text-white shadow-lg group-hover:scale-105 transition-transform">
-            N
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-700 flex items-center justify-center text-sm font-bold text-white shadow-lg group-hover:scale-105 transition-transform">
+            {user?.name?.[0] || 'N'}
           </div>
           <div className="flex flex-col items-start flex-1 min-w-0">
-            <span className="text-sm font-medium text-white truncate">Nikita</span>
+            <span className="text-sm font-medium text-white truncate">{user?.name || 'Nikita'}</span>
             <span className="text-xs text-zinc-500 truncate">Pro Plan</span>
           </div>
           <Settings className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
+        </button>
+        
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all group"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-xs font-bold uppercase tracking-widest">Logout</span>
         </button>
       </div>
     </div>

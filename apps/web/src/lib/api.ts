@@ -13,10 +13,22 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     return { success: false, error: 'Relative fetch skipped during SSR/Build' };
   }
 
+  // Auth Handling
+  const fetchOptions = { ...options };
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('df_token');
+    if (token) {
+      fetchOptions.headers = {
+        ...(fetchOptions.headers || {}),
+        'Authorization': `Bearer ${token}`
+      } as any;
+    }
+  }
+
   const url = `${API_BASE}${normalizedPath}`;
   
   try {
-    const res = await fetch(url, options);
+    const res = await fetch(url, fetchOptions);
     const text = await res.text();
 
     try {

@@ -134,7 +134,7 @@ app.use(async (req, res, next) => {
   const baseDomain = process.env.APP_SUBDOMAIN_BASE || 'deployflow.dev';
 
   // 0. Skip for API routes and Localhost
-  if (req.path.startsWith('/api/') || host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+  if (req.path.startsWith('/api') || host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
     return next();
   }
 

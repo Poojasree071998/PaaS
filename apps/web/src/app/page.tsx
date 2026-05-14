@@ -1,5 +1,8 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
+import React from "react";
 import Link from "next/link";
 import { getApiUrl } from "@/lib/api";
 import { motion } from "framer-motion";
@@ -28,6 +31,14 @@ export default function Home() {
     },
   };
 
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLoggedIn(!!localStorage.getItem('df_token'));
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-black text-white selection:bg-blue-500/30 overflow-hidden relative font-sans">
       {/* Background gradients */}
@@ -54,12 +65,26 @@ export default function Home() {
           <Link href="/pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">
             Pricing
           </Link>
-          <Link 
-            href="/dashboard" 
-            className="text-sm font-medium bg-white text-black px-4 py-2 rounded-full hover:bg-zinc-200 transition-colors"
-          >
-            Go to Dashboard
-          </Link>
+          {isLoggedIn ? (
+            <Link 
+              href="/dashboard" 
+              className="text-sm font-medium bg-white text-black px-4 py-2 rounded-full hover:bg-zinc-200 transition-colors"
+            >
+              Go to Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="text-sm text-zinc-400 hover:text-white transition-colors">
+                Log In
+              </Link>
+              <Link 
+                href="/register" 
+                className="text-sm font-medium bg-white text-black px-4 py-2 rounded-full hover:bg-zinc-200 transition-colors"
+              >
+                Sign Up
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -95,10 +120,10 @@ export default function Home() {
 
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center gap-4">
             <Link 
-              href="/dashboard"
+              href={isLoggedIn ? "/dashboard" : "/register"}
               className="flex items-center gap-2 bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-zinc-200 hover:scale-105 active:scale-95 transition-all"
             >
-              Start Deploying <ArrowRight className="w-5 h-5" />
+              {isLoggedIn ? "Go to Dashboard" : "Start Deploying"} <ArrowRight className="w-5 h-5" />
             </Link>
             <Link 
               href="https://github.com"
