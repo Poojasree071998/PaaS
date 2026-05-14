@@ -6,6 +6,13 @@ export const API_BASE = "";
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  
+  // SSR/Build Safety: Next.js 15+ can crash if fetch is called with a relative URL on the server
+  if (typeof window === 'undefined' && !API_BASE) {
+    console.warn(`[Build/SSR] Skipping relative fetch: ${normalizedPath}`);
+    return { success: false, error: 'Relative fetch skipped during SSR/Build' };
+  }
+
   const url = `${API_BASE}${normalizedPath}`;
   
   try {
@@ -17,13 +24,14 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
       return data;
     } catch (e) {
       if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-        throw new Error(`API returned HTML instead of JSON. This means the Vercel Proxy is hit but forwarding to Render failed. URL: ${url}`);
+        throw new Error(`API returned HTML instead of JSON. URL: ${url}`);
       }
-      throw new Error(`Invalid JSON from ${url}. Response starts with: ${text.substring(0, 50)}`);
+      throw new Error(`Invalid JSON from ${url}.`);
     }
   } catch (err: any) {
-    if (err.message === 'Failed to fetch') {
-      throw new Error(`Connection failed to ${url}. The Vercel proxy might be misconfigured.`);
+    if (typeof window === 'undefined') {
+      console.error(`[Build/SSR Error] Fetch failed for ${url}:`, err.message);
+      return { success: false, error: err.message };
     }
     throw err;
   }
