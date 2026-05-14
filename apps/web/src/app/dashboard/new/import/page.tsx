@@ -321,6 +321,9 @@ export default function ImportProjectPage() {
             </>
           )}
         </button>
+        <div className="text-[10px] text-zinc-600 text-center mt-4 uppercase tracking-widest font-bold">
+          Version 2.2 (Hardcoded API: https://paas-k7nx.onrender.com)
+        </div>
       </div>
 
       <div className="glass-card p-6 bg-blue-500/5 border-blue-500/20">
