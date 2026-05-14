@@ -198,8 +198,12 @@ export class BuildService {
       
       const git = simpleGit();
       if (!fs.existsSync(path.join(buildDir, '.git'))) {
-        await git.clone(deployment.project.repoUrl, buildDir);
+        await Promise.race([
+          git.clone(deployment.project.repoUrl, buildDir),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timeout: Repository may be private or too large')), 30000))
+        ]);
       } else {
+
         await git.cwd(buildDir).reset(['--hard']).pull();
       }
 

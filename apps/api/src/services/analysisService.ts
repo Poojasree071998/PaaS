@@ -23,9 +23,13 @@ export class AnalysisService {
     try {
       if (!fs.existsSync(tempDir)) await fsPromises.mkdir(tempDir, { recursive: true });
 
-      // Shallow clone to analyze structure
+      // Shallow clone with timeout to avoid hanging on private repos
       const git = simpleGit();
-      await git.clone(repoUrl, tempDir, ['--depth', '1']);
+      await Promise.race([
+        git.clone(repoUrl, tempDir, ['--depth', '1']),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timeout: Repository may be private or too large')), 15000))
+      ]);
+
 
       const result: AnalysisResult = {
         framework: Framework.STATIC,

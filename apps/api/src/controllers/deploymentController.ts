@@ -45,7 +45,21 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
     let project = await prisma.project.findFirst({ where: { repoUrl } });
     
     // Always analyze for fresh settings (True Auto-Pilot)
-    const analysis = await AnalysisService.analyzeRepository(repoUrl);
+    let analysis;
+    try {
+      analysis = await AnalysisService.analyzeRepository(repoUrl);
+    } catch (e) {
+      console.warn('Auto-analysis failed, falling back to defaults:', e);
+      analysis = {
+        framework: Framework.STATIC,
+        databaseRequired: 'NONE',
+        buildCommand: 'npm run build',
+        rootDirectory: './',
+        requiredEnvVars: [],
+        detectedEnv: {}
+      };
+    }
+
 
     if (!project) {
       const name = repoUrl.split('/').pop() || 'new-project';
