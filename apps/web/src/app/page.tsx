@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { getApiUrl } from "@/lib/api";
-import { motion, Variants } from "framer-motion";
+import { motion } from "framer-motion";
 import { Rocket, Code, Globe, Zap, Shield, ArrowRight, Layers, Box } from "lucide-react";
 
 export default function Home() {
-  const containerVariants: Variants = {
+  const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -15,8 +15,8 @@ export default function Home() {
       },
     },
   };
-
-  const itemVariants: Variants = {
+...
+  const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     visible: {
       y: 0,
