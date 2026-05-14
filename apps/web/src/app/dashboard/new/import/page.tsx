@@ -138,10 +138,11 @@ export default function ImportProjectPage() {
         data = JSON.parse(text);
       } catch (e) {
         // If it's HTML, it's likely Render waking up or a 404 from Vercel (if old version)
+        const url = `https://paas-k7nx.onrender.com/api/deployments`;
         if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-          throw new Error(`The Render backend is currently waking up or returned an error page. Please wait 30 seconds and try again. (Raw response was HTML)`);
+          throw new Error(`The Render backend (${url}) is currently waking up or returned an error page. Please wait 30 seconds and try again. (Raw response was HTML)`);
         }
-        throw new Error(`Invalid JSON response from backend. Response: ${text.substring(0, 50)}...`);
+        throw new Error(`Invalid JSON response from ${url}. Response: ${text.substring(0, 50)}...`);
       }
 
       if (data.success) {
