@@ -13,8 +13,8 @@ const NEXT_PUBLIC_API = process.env.NEXT_PUBLIC_VITE_API_BASE;
 // 2. Fallback to other possible names (less reliable in browser, but good for SSR)
 const VITE_API = process.env.VITE_API_BASE || process.env.VITE_API_URL || process.env.VITE_BACKEND_URL;
 
-// 3. Final Production Fallback
-const DEFAULT_API = "https://paas-k7nx.onrender.com";
+// 3. Final Production Fallback (Empty string means use Vercel/Next.js rewrites)
+const DEFAULT_API = "";
 
 // Consolidate and ensure we NEVER return an empty string (which would cause relative requests)
 export const API_BASE = (NEXT_PUBLIC_API || VITE_API || DEFAULT_API).trim();
