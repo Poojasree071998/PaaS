@@ -1,21 +1,24 @@
 export const getApiUrl = () => {
+  // 1. Priority: Environment Variable
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   
-  // Check if we are in a browser and not on localhost
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return 'https://paas-k7nx.onrender.com';
-    }
-  } else {
-    // During SSR, check environment variables that Vercel or other platforms might set
-    if (process.env.NODE_ENV === 'production') {
-      return 'https://paas-k7nx.onrender.com';
-    }
+  // 2. Production Fallback (Render)
+  const isProd = 
+    (typeof window !== 'undefined' && (
+      window.location.hostname.includes('vercel.app') || 
+      window.location.hostname.includes('onrender.com') ||
+      (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
+    )) || 
+    process.env.NODE_ENV === 'production';
+
+  if (isProd) {
+    return 'https://paas-k7nx.onrender.com';
   }
 
-  // Default to local development
+  // 3. Local Development Fallback
   return 'http://localhost:4000';
 };
+
 
 export const getSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
