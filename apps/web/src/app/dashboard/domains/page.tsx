@@ -17,7 +17,7 @@ import {
   ChevronDown,
   ShieldCheck
 } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getApiUrl } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
