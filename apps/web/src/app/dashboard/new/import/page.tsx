@@ -137,7 +137,11 @@ export default function ImportProjectPage() {
       try {
         data = JSON.parse(text);
       } catch (e) {
-        throw new Error(`Backend returned HTML/error page instead of JSON. This usually means the API URL or route is wrong. Response: ${text.substring(0, 100)}...`);
+        // If it's HTML, it's likely Render waking up or a 404 from Vercel (if old version)
+        if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+          throw new Error(`The Render backend is currently waking up or returned an error page. Please wait 30 seconds and try again. (Raw response was HTML)`);
+        }
+        throw new Error(`Invalid JSON response from backend. Response: ${text.substring(0, 50)}...`);
       }
 
       if (data.success) {
