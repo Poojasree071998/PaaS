@@ -44,14 +44,13 @@ export default function Home() {
           <span className="text-xl font-bold tracking-tight">DeployFlow</span>
         </div>
         <div className="flex items-center gap-6">
-          <a 
-            href={`${getApiUrl()}/api/docs`} 
+          <Link 
+            href="https://paas-k7nx.onrender.com/api/docs" 
             target="_blank"
-            rel="noopener noreferrer"
             className="text-sm text-zinc-400 hover:text-white transition-colors"
           >
             Documentation
-          </a>
+          </Link>
           <Link href="/pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">
             Pricing
           </Link>
