@@ -22,6 +22,6 @@ export const getSocketUrl = () => {
     return 'http://localhost:4000';
   }
   
-  return 'https://paas-k7nx.onrender.com';
+  return process.env.NEXT_PUBLIC_VITE_API_BASE || 'https://paas-k7nx.onrender.com';
 };
 

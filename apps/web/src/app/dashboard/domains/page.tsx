@@ -45,10 +45,10 @@ export default function DomainsPage() {
 
   const fetchData = async () => {
     try {
-      const apiUrl = getApiUrl();
+      const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
       const [domainsRes, projectsRes] = await Promise.all([
-        fetch(`https://paas-k7nx.onrender.com/api/domains`),
-        fetch(`https://paas-k7nx.onrender.com/api/projects`)
+        fetch(`${API_BASE}/api/domains`),
+        fetch(`${API_BASE}/api/projects`)
       ]);
 
       
@@ -291,7 +291,7 @@ export default function DomainsPage() {
                           </button>
                         )}
                         <a 
-                          href={`${getApiUrl()}?__df_host=${domain.hostname}`} 
+                          href={`${process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com"}?__df_host=${domain.hostname}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-bold transition-all border border-emerald-500/20 group-hover:scale-105 active:scale-95"
