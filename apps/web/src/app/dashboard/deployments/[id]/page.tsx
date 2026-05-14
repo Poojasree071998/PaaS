@@ -62,9 +62,10 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
       try {
         const apiUrl = getApiUrl();
         const [depRes, logsRes] = await Promise.all([
-          fetch(`${apiUrl}/api/deployments/${id}`),
-          fetch(`${apiUrl}/api/deployments/${id}/logs`)
+          fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}`),
+          fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}/logs`)
         ]);
+
         
         const depData = await depRes.json();
         const logsData = await logsRes.json();
@@ -112,9 +113,10 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
       // If build finished, re-fetch to get the final URL and metadata
       if (newStatus === 'READY' || newStatus === 'ERROR') {
         const apiUrl = getApiUrl();
-        const res = await fetch(`${apiUrl}/api/deployments/${id}`);
+        const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}`);
         const data = await res.json();
         if (data.success) setDeployment(data.data);
+
       }
     });
 
@@ -185,8 +187,9 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                 <button
                   onClick={async () => {
                     const apiUrl = getApiUrl();
-                    const res = await fetch(`${apiUrl}/api/deployments/${id}/promote`, { method: 'POST' });
+                    const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments/${id}/promote`, { method: 'POST' });
                     const data = await res.json();
+
                     if (data.success) {
                       alert('Successfully promoted to production!');
                     }
@@ -202,7 +205,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
               onClick={async () => {
                 try {
                   const apiUrl = getApiUrl();
-                  const res = await fetch(`${apiUrl}/api/deployments`, {
+                  const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -213,6 +216,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                     })
                   });
                   const data = await res.json();
+
                   if (data.success) {
                     window.location.href = `/dashboard/deployments/${data.data.id}`;
                   } else {

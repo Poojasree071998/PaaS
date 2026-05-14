@@ -54,7 +54,7 @@ export default function ImportProjectPage() {
   const linkDatabase = async () => {
     try {
       const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/api/databases?teamId=default`);
+      const res = await fetch(`https://paas-k7nx.onrender.com/api/databases?teamId=default`);
       const data = await res.json();
       if (data.success && data.data.length > 0) {
         const db = data.data[0];
@@ -82,7 +82,7 @@ export default function ImportProjectPage() {
     if (!repoUrl || !repoUrl.startsWith('https://github.com/')) return;
     try {
       const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/api/deployments/analyze`, {
+      const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl })
@@ -113,7 +113,7 @@ export default function ImportProjectPage() {
     
     try {
       const apiUrl = getApiUrl();
-      const response = await fetch(`${apiUrl}/api/deployments`, {
+      const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

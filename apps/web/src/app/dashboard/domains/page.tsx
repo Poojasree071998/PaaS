@@ -47,9 +47,10 @@ export default function DomainsPage() {
     try {
       const apiUrl = getApiUrl();
       const [domainsRes, projectsRes] = await Promise.all([
-        fetch(`${apiUrl}/api/domains`),
-        fetch(`${apiUrl}/api/projects`)
+        fetch(`https://paas-k7nx.onrender.com/api/domains`),
+        fetch(`https://paas-k7nx.onrender.com/api/projects`)
       ]);
+
       
       const domainsData = await domainsRes.json();
       const projectsData = await projectsRes.json();

@@ -22,7 +22,7 @@ export default function ProjectsPage() {
       try {
         const apiUrl = getApiUrl();
         // Assuming teamId is available or using a default for now
-        const res = await fetch(`${apiUrl}/api/projects`);
+        const res = await fetch(`https://paas-k7nx.onrender.com/api/projects`);
         const data = await res.json();
         if (data.success) {
           setProjects(data.data);

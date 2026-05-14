@@ -23,7 +23,7 @@ export default function DashboardOverview() {
     const fetchData = async () => {
       try {
         const apiUrl = getApiUrl();
-        const response = await fetch(`${apiUrl}/api/deployments`);
+        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`);
         const data = await response.json();
         if (data.success) {
           const deps = data.data;
