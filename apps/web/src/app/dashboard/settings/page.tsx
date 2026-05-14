@@ -13,7 +13,7 @@ import {
   Loader2,
   ChevronDown
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 interface EnvVar {
   id?: string;
@@ -46,8 +46,7 @@ export default function SettingsPage() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${getApiUrl()}/api/projects`);
-      const data = await res.json();
+      const data = await apiFetch('/api/projects');
       if (data.success) {
         setProjects(data.data);
         if (data.data.length > 0) {
@@ -64,8 +63,7 @@ export default function SettingsPage() {
 
   const fetchProjectSettings = async (id: string) => {
     try {
-      const res = await fetch(`${getApiUrl()}/api/projects/${id}`);
-      const data = await res.json();
+      const data = await apiFetch(`/api/projects/${id}`);
       if (data.success) {
         setEnvVars(data.data.envVars || []);
       }
@@ -97,12 +95,11 @@ export default function SettingsPage() {
     if (!selectedProjectId) return;
     setSaving(true);
     try {
-      const res = await fetch(`${getApiUrl()}/api/projects/${selectedProjectId}`, {
+      const data = await apiFetch(`/api/projects/${selectedProjectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ envVars }),
       });
-      const data = await res.json();
       if (data.success) {
         alert('Settings saved! Your next deployment will use these variables.');
       }

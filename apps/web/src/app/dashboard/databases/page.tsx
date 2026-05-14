@@ -16,7 +16,7 @@ import {
   Trash2,
   X
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 interface ManagedDatabase {
   id: string;
@@ -44,8 +44,7 @@ export default function DatabasesPage() {
 
   const fetchDatabases = async () => {
     try {
-      const res = await fetch(`${getApiUrl()}/api/databases?teamId=default`); // Simplified teamId
-      const data = await res.json();
+      const data = await apiFetch('/api/databases?teamId=default'); // Simplified teamId
       if (data.success) {
         setDatabases(data.data);
       }
@@ -60,7 +59,7 @@ export default function DatabasesPage() {
     if (!newName) return;
     setCreating(true);
     try {
-      const res = await fetch(`${getApiUrl()}/api/databases`, {
+      const data = await apiFetch('/api/databases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -69,7 +68,6 @@ export default function DatabasesPage() {
           teamId: 'default' 
         }),
       });
-      const data = await res.json();
       if (data.success) {
         // Force refresh the list
         await fetchDatabases();
@@ -88,7 +86,7 @@ export default function DatabasesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this database? All data will be lost.')) return;
     try {
-      await fetch(`${getApiUrl()}/api/databases/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/databases/${id}`, { method: 'DELETE' });
       setDatabases(databases.filter(db => db.id !== id));
     } catch (error) {
       alert('Failed to delete database.');

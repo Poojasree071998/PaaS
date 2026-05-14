@@ -13,7 +13,7 @@ import {
   CreditCard,
   Plus
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -35,7 +35,7 @@ export function Sidebar() {
   useEffect(() => {
     const wakeUp = async () => {
       try {
-        await fetch(`${getApiUrl()}/health`).catch(() => {});
+        await apiFetch('/health');
       } catch (e) {}
     };
     wakeUp();

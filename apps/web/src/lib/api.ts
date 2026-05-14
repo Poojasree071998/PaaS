@@ -1,26 +1,44 @@
-// Last Updated: 2026-05-14T15:20:00Z
-export const getApiUrl = () => {
-  // Use NEXT_PUBLIC_ prefix for client-side environment variables in Next.js
-  const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
+// apps/web/src/lib/api.ts
+
+// Support both Next.js (process.env) and Vite (import.meta.env) style env vars
+const getEnv = (name: string) => {
+  if (typeof process !== 'undefined' && process.env && process.env[name]) return process.env[name];
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[name]) return import.meta.env[name];
+  return undefined;
+};
+
+export const API_BASE = 
+  getEnv('NEXT_PUBLIC_VITE_API_BASE') ||
+  getEnv('VITE_API_BASE') ||
+  getEnv('VITE_API_URL') ||
+  getEnv('VITE_BACKEND_URL') ||
+  "https://paas-k7nx.onrender.com";
+
+export async function apiFetch(path: string, options: RequestInit = {}) {
+  // Ensure path starts with /
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = `${API_BASE}${normalizedPath}`;
   
-  if (typeof window !== 'undefined') {
-    // If we are explicitly on localhost and NOT overriding via env var, use local API
-    if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && !process.env.NEXT_PUBLIC_VITE_API_BASE) {
-      return 'http://localhost:4000';
+  const res = await fetch(url, options);
+  const text = await res.text();
+
+  try {
+    const data = JSON.parse(text);
+    return data;
+  } catch (e) {
+    // If it's HTML, provide a better error message
+    if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+      throw new Error(`API returned HTML, not JSON. This usually means the Render backend (${API_BASE}) is waking up or there is a 404/500 error. Please try again in 30 seconds.`);
     }
+    throw new Error(`API returned invalid JSON from ${url}. Response: ${text.substring(0, 100)}...`);
   }
-  
+}
+
+// Keep for WebSocket support
+export const getSocketUrl = () => {
   return API_BASE;
 };
 
-export const getSocketUrl = () => {
-  const socketBase = process.env.NEXT_PUBLIC_VITE_API_BASE || 'https://paas-k7nx.onrender.com';
-  
-  if (typeof window !== 'undefined') {
-    if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && !process.env.NEXT_PUBLIC_VITE_API_BASE) {
-      return 'http://localhost:4000';
-    }
-  }
-  
-  return socketBase;
-};
+// For backward compatibility during migration
+export const getApiUrl = () => API_BASE;

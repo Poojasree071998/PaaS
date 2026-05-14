@@ -11,7 +11,7 @@ import {
 import Link from 'next/link';
 
 import { useEffect, useState } from 'react';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardOverview() {
@@ -22,8 +22,7 @@ export default function DashboardOverview() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${getApiUrl()}/api/deployments`);
-        const data = await response.json();
+        const data = await apiFetch('/api/deployments');
         if (data.success) {
           const deps = data.data;
           setRecentDeployments(deps.slice(0, 4));

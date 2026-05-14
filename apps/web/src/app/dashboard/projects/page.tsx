@@ -10,7 +10,7 @@ import {
   ArrowUpRight,
   Search
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function ProjectsPage() {
@@ -20,8 +20,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const res = await fetch(`${getApiUrl()}/api/projects`);
-        const data = await res.json();
+        const data = await apiFetch('/api/projects');
         if (data.success) {
           setProjects(data.data);
         }

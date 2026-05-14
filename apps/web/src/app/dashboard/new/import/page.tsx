@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch, getApiUrl } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -53,14 +53,7 @@ export default function ImportProjectPage() {
 
   const linkDatabase = async () => {
     try {
-      const res = await fetch(`${getApiUrl()}/api/databases?teamId=default`);
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Backend returned non-JSON response. Check if the Render service is awake.`);
-      }
+      const data = await apiFetch('/api/databases?teamId=default');
       
       if (data.success && data.data.length > 0) {
         const db = data.data[0];
@@ -87,20 +80,11 @@ export default function ImportProjectPage() {
   const analyzeUrl = async (repoUrl: string) => {
     if (!repoUrl || !repoUrl.startsWith('https://github.com/')) return;
     try {
-      const res = await fetch(`${getApiUrl()}/api/deployments/analyze`, {
+      const data = await apiFetch('/api/deployments/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl })
       });
-      
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.warn('Backend returned non-JSON for analysis:', text.substring(0, 50));
-        return;
-      }
 
       if (data.success) {
         const analysis = data.data;
@@ -127,7 +111,7 @@ export default function ImportProjectPage() {
     setLoading(true);
     
     try {
-      const response = await fetch(`${getApiUrl()}/api/deployments`, {
+      const data = await apiFetch('/api/deployments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -138,18 +122,6 @@ export default function ImportProjectPage() {
           envVars: envVars.filter(v => v.key && v.value)
         })
       });
-      
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        const baseUrl = getApiUrl();
-        if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-          throw new Error(`The Render backend (${baseUrl}) returned an HTML page. This usually means the service is waking up or there is a configuration error on the backend. Please try again in 30 seconds.`);
-        }
-        throw new Error(`Invalid JSON response from backend. Raw response starts with: ${text.substring(0, 100)}`);
-      }
 
       if (data.success) {
         localStorage.removeItem('df_project_draft'); // Clear draft on success

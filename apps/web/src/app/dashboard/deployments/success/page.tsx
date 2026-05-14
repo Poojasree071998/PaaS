@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { Loader2, Globe, Server, CheckCircle2, ChevronRight, Terminal } from 'lucide-react';
 
 function SuccessPageContent() {
@@ -15,8 +15,7 @@ function SuccessPageContent() {
     if (!id) return;
     const fetchDeployment = async () => {
       try {
-        const response = await fetch(`${getApiUrl()}/api/deployments/${id}`);
-        const data = await response.json();
+        const data = await apiFetch(`/api/deployments/${id}`);
         if (data.success) setDeployment(data.data);
       } catch (e) {
         console.error(e);

@@ -17,8 +17,9 @@ import {
   ChevronDown,
   ShieldCheck
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 export default function DomainsPage() {
   const [domains, setDomains] = useState<any[]>([]);
@@ -45,14 +46,10 @@ export default function DomainsPage() {
 
   const fetchData = async () => {
     try {
-      const [domainsRes, projectsRes] = await Promise.all([
-        fetch(`${getApiUrl()}/api/domains`),
-        fetch(`${getApiUrl()}/api/projects`)
+      const [domainsData, projectsData] = await Promise.all([
+        apiFetch('/api/domains'),
+        apiFetch('/api/projects')
       ]);
-
-      
-      const domainsData = await domainsRes.json();
-      const projectsData = await projectsRes.json();
 
       if (domainsData.success) setDomains(domainsData.data);
       if (projectsData.success) {
@@ -74,12 +71,11 @@ export default function DomainsPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${getApiUrl()}/api/domains/${selectedProjectId}`, {
+      const data = await apiFetch(`/api/domains/${selectedProjectId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hostname: newHostname })
       });
-      const data = await res.json();
       if (data.success) {
         setDomains([data.data, ...domains]);
         setIsAddModalOpen(false);
@@ -99,10 +95,9 @@ export default function DomainsPage() {
 
     setDeleting(true);
     try {
-      const res = await fetch(`${getApiUrl()}/api/domains/${deleteConfirmId}`, {
+      const data = await apiFetch(`/api/domains/${deleteConfirmId}`, {
         method: 'DELETE'
       });
-      const data = await res.json();
       if (data.success) {
         setDomains(domains.filter(d => d.id !== deleteConfirmId));
         setDeleteConfirmId(null);
@@ -117,10 +112,9 @@ export default function DomainsPage() {
   const handleVerify = async (domainId: string) => {
     setVerifyingId(domainId);
     try {
-      const res = await fetch(`${getApiUrl()}/api/domains/${domainId}/verify`, {
+      const data = await apiFetch(`/api/domains/${domainId}/verify`, {
         method: 'POST'
       });
-      const data = await res.json();
       if (data.success && data.verified) {
         setDomains(domains.map(d => d.id === domainId ? { ...d, verified: true } : d));
         setSelectedDomainForDns(null);
@@ -137,10 +131,9 @@ export default function DomainsPage() {
   const handleProvisionSSL = async (domainId: string) => {
     setProvisioningId(domainId);
     try {
-      const res = await fetch(`${getApiUrl()}/api/domains/${domainId}/ssl`, {
+      const data = await apiFetch(`/api/domains/${domainId}/ssl`, {
         method: 'POST'
       });
-      const data = await res.json();
       if (data.success) {
         setDomains(domains.map(d => d.id === domainId ? { ...d, sslStatus: 'ACTIVE' } : d));
       } else {

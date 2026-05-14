@@ -14,8 +14,9 @@ import {
   Loader2,
   Trash2
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function DeploymentsPage() {
   const [deployments, setDeployments] = useState<any[]>([]);
@@ -24,9 +25,7 @@ export default function DeploymentsPage() {
   useEffect(() => {
     const fetchDeployments = async () => {
       try {
-        const response = await fetch(`${getApiUrl()}/api/deployments`);
-        
-        const data = await response.json();
+        const data = await apiFetch('/api/deployments');
         if (data.success) {
           setDeployments(data.data);
         }
@@ -56,11 +55,11 @@ export default function DeploymentsPage() {
       if (!window.confirm('Are you sure you want to delete this deployment? This action cannot be undone.')) return;
       
       try {
-        const response = await fetch(`${getApiUrl()}/api/deployments/${id}`, {
+        const data = await apiFetch(`/api/deployments/${id}`, {
           method: 'DELETE'
         });
         
-        if (response.ok) {
+        if (data.success) {
           setDeployments(prev => prev.filter(d => d.id !== id));
         }
       } catch (error) {

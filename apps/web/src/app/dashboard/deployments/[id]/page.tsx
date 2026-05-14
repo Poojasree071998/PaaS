@@ -19,7 +19,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import Link from 'next/link';
-import { getApiUrl, getSocketUrl } from '@/lib/api';
+import { apiFetch, getSocketUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 interface Log {
@@ -60,18 +60,14 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [depRes, logsRes] = await Promise.all([
-          fetch(`${getApiUrl()}/api/deployments/${id}`),
-          fetch(`${getApiUrl()}/api/deployments/${id}/logs`)
+        const [data, logsData] = await Promise.all([
+          apiFetch(`/api/deployments/${id}`),
+          apiFetch(`/api/deployments/${id}/logs`)
         ]);
 
-        
-        const depData = await depRes.json();
-        const logsData = await logsRes.json();
-        
-        if (depData.success) {
-          setDeployment(depData.data);
-          setStatus(depData.data.status);
+        if (data.success) {
+          setDeployment(data.data);
+          setStatus(data.data.status);
         }
         if (logsData.success) {
           setLogs(logsData.data.map((l: any) => ({
@@ -111,10 +107,8 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
       setStatus(newStatus);
       // If build finished, re-fetch to get the final URL and metadata
       if (newStatus === 'READY' || newStatus === 'ERROR') {
-        const res = await fetch(`${getApiUrl()}/api/deployments/${id}`);
-        const data = await res.json();
+        const data = await apiFetch(`/api/deployments/${id}`);
         if (data.success) setDeployment(data.data);
-
       }
     });
 
@@ -184,8 +178,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                 
                 <button
                   onClick={async () => {
-                    const res = await fetch(`${getApiUrl()}/api/deployments/${id}/promote`, { method: 'POST' });
-                    const data = await res.json();
+                    const data = await apiFetch(`/api/deployments/${id}/promote`, { method: 'POST' });
 
                     if (data.success) {
                       alert('Successfully promoted to production!');
@@ -201,7 +194,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
             <button
               onClick={async () => {
                 try {
-                  const res = await fetch(`${getApiUrl()}/api/deployments`, {
+                  const data = await apiFetch('/api/deployments', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -211,7 +204,6 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                       rootDirectory: deployment.project.rootDirectory
                     })
                   });
-                  const data = await res.json();
 
                   if (data.success) {
                     window.location.href = `/dashboard/deployments/${data.data.id}`;
