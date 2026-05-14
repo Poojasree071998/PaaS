@@ -54,7 +54,14 @@ export default function ImportProjectPage() {
   const linkDatabase = async () => {
     try {
       const res = await fetch(`${getApiUrl()}/api/databases?teamId=default`);
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Backend returned non-JSON response. Check if the Render service is awake.`);
+      }
+      
       if (data.success && data.data.length > 0) {
         const db = data.data[0];
         const key = db.type === 'MONGODB' ? 'MONGODB_URI' : 'DATABASE_URL';
@@ -62,8 +69,8 @@ export default function ImportProjectPage() {
       } else {
         alert('No managed databases found. Create one in the Databases tab first!');
       }
-    } catch (e) {
-      alert('Failed to fetch databases.');
+    } catch (e: any) {
+      alert(`Database Link Failed: ${e.message}`);
     }
   };
 
@@ -137,12 +144,11 @@ export default function ImportProjectPage() {
       try {
         data = JSON.parse(text);
       } catch (e) {
-        // If it's HTML, it's likely Render waking up or a 404 from Vercel (if old version)
-        const url = `${getApiUrl()}/api/deployments`;
+        const baseUrl = getApiUrl();
         if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-          throw new Error(`The Render backend (${url}) is currently waking up or returned an error page. Please wait 30 seconds and try again. (Raw response was HTML)`);
+          throw new Error(`The Render backend (${baseUrl}) returned an HTML page. This usually means the service is waking up or there is a configuration error on the backend. Please try again in 30 seconds.`);
         }
-        throw new Error(`Invalid JSON response from ${url}. Response: ${text.substring(0, 50)}...`);
+        throw new Error(`Invalid JSON response from backend. Raw response starts with: ${text.substring(0, 100)}`);
       }
 
       if (data.success) {
@@ -322,7 +328,7 @@ export default function ImportProjectPage() {
           )}
         </button>
         <div className="text-[10px] text-zinc-600 text-center mt-4 uppercase tracking-widest font-bold">
-          Version 2.4 (Environment: {getApiUrl()})
+          Version 2.4 (Endpoint: {getApiUrl()})
         </div>
       </div>
 
