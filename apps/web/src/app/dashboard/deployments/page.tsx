@@ -24,11 +24,8 @@ export default function DeploymentsPage() {
   useEffect(() => {
     const fetchDeployments = async () => {
       try {
-        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`, {
-          signal: controller.signal
-        });
+        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`);
         
-        clearTimeout(timeoutId);
         const data = await response.json();
         if (data.success) {
           setDeployments(data.data);

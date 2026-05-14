@@ -35,8 +35,7 @@ export function Sidebar() {
   useEffect(() => {
     const wakeUp = async () => {
       try {
-        await fetch(`https://paas-k7nx.onrender.com/health`, { signal: controller.signal }).catch(() => {});
-        clearTimeout(timeoutId);
+        await fetch(`https://paas-k7nx.onrender.com/health`).catch(() => {});
       } catch (e) {}
     };
     wakeUp();
