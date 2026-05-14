@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Rocket, Code, Globe, Zap, Shield, ArrowRight, Layers, Box } from "lucide-react";
 
 export default function Home() {
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -15,8 +15,8 @@ export default function Home() {
       },
     },
   };
-...
-  const itemVariants = {
+
+  const itemVariants: any = {
     hidden: { y: 20, opacity: 0 },
     visible: {
       y: 0,
