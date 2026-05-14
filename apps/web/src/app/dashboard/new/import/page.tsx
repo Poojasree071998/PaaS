@@ -166,8 +166,8 @@ export default function ImportProjectPage() {
           <ChevronLeft className="w-5 h-5 text-zinc-400" />
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">FIXED - Import Repository (v2.3)</h1>
-          <p className="text-zinc-500">Auto-Pilot will handle your configuration automatically.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">FIXED - Import Repository (v2.4)</h1>
+          <p className="text-zinc-500">Last Build: {new Date().toLocaleTimeString()} - Auto-Pilot Active</p>
         </div>
       </div>
 
@@ -322,7 +322,7 @@ export default function ImportProjectPage() {
           )}
         </button>
         <div className="text-[10px] text-zinc-600 text-center mt-4 uppercase tracking-widest font-bold">
-          Version 2.2 (Hardcoded API: https://paas-k7nx.onrender.com)
+          Version 2.4 (Hardcoded API: https://paas-k7nx.onrender.com)
         </div>
       </div>
 
