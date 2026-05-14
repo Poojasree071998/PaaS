@@ -8,6 +8,7 @@ export const initSocket = (server: HttpServer) => {
     cors: {
       origin: (origin, callback) => {
         const allowedOrigins = [
+          "https://paas-1.vercel.app",
           "https://deployflow-web.onrender.com", 
           "https://bejewelled-griffin-055a6f.netlify.app",
           "http://localhost:3000",
@@ -15,11 +16,12 @@ export const initSocket = (server: HttpServer) => {
           "http://localhost:5173"
         ];
         
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.netlify.app')) {
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.netlify.app') || origin.endsWith('.vercel.app')) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
         }
+
       },
       methods: ["GET", "POST"],
       credentials: true

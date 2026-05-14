@@ -290,7 +290,7 @@ export default function DomainsPage() {
                           </button>
                         )}
                         <a 
-                          href={`http://localhost:4000?__df_host=${domain.hostname}`} 
+                          href={`${getApiUrl()}?__df_host=${domain.hostname}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-bold transition-all border border-emerald-500/20 group-hover:scale-105 active:scale-95"

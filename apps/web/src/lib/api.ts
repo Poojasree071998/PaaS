@@ -1,20 +1,29 @@
 export const getApiUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    // If we are on Vercel, we MUST point to the actual backend on Render
-    return 'https://paas-k7nx.onrender.com';
+  // Check if we are in a browser and not on localhost
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return 'https://paas-k7nx.onrender.com';
+    }
+  } else {
+    // During SSR, check environment variables that Vercel or other platforms might set
+    if (process.env.NODE_ENV === 'production') {
+      return 'https://paas-k7nx.onrender.com';
+    }
   }
 
-  // Handle local development
+  // Default to local development
   return 'http://localhost:4000';
 };
 
 export const getSocketUrl = () => {
-  // Use local API for development, Render for production
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:4000';
   }
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  
   return 'https://paas-k7nx.onrender.com';
 };
+
