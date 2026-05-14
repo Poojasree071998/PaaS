@@ -52,7 +52,9 @@ export class BuildService {
       }
     });
 
-    const publicUrl = `http://localhost:4000/live/${deployment.id}`;
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+    const baseUrl = isProduction ? 'https://paas-k7nx.onrender.com' : 'http://localhost:4000';
+    const publicUrl = `${baseUrl}/live/${deployment.id}`;
     if (!env.API_URL && !env.BACKEND_URL) {
       env.API_URL = publicUrl;
       env.BACKEND_URL = publicUrl;
@@ -315,7 +317,9 @@ export class BuildService {
         await this.log(deploymentId, `[3/4] ⏩ No build script found. Skipping build phase.`, LogLevel.INFO);
       }
 
-      const projectUrl = `http://localhost:4000/live/${deploymentId}/`;
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+      const baseUrl = isProduction ? 'https://paas-k7nx.onrender.com' : 'http://localhost:4000';
+      const projectUrl = `${baseUrl}/live/${deploymentId}/`;
       await this.startRuntime(deploymentId, deployment, workingDir);
 
       // --- FINAL HARDENING: Post-Build Health Guard with Grace Period ---

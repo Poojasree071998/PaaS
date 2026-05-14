@@ -18,7 +18,7 @@ export const analyzeProject = async (req: Request, res: Response, next: NextFunc
 
 export const triggerDeploy = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { repoUrl, buildCommand, branch, rootDirectory } = req.body;
+    const { repoUrl, buildCommand, branch, rootDirectory, envVars } = req.body;
     
     // 1. Get or create a default user for the demo
     let user = await prisma.user.findFirst();
@@ -61,6 +61,8 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
     }
 
 
+    const processedEnvVars = envVars ? envVars.filter((v: any) => v.key && v.value) : [];
+
     if (!project) {
       const name = repoUrl.split('/').pop() || 'new-project';
       project = await prisma.project.create({
@@ -75,10 +77,12 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
           userId,
           buildCommand: buildCommand || analysis.buildCommand || 'npm run build',
           repoBranch: branch || 'main',
-          rootDirectory: rootDirectory || analysis.rootDirectory || './'
+          rootDirectory: rootDirectory || analysis.rootDirectory || './',
+          envVars: {
+            create: processedEnvVars
+          }
         }
       });
-
       // --- AUTO-PROVISIONING (Zero-Config DB) ---
       if (analysis.databaseRequired !== 'NONE') {
         const dbType = analysis.databaseRequired;
@@ -105,7 +109,11 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
           buildCommand: buildCommand || project.buildCommand || analysis.buildCommand,
           repoBranch: branch || project.repoBranch,
           rootDirectory: rootDirectory || project.rootDirectory || analysis.rootDirectory,
-          framework: (analysis.framework as Framework) || project.framework
+          framework: (analysis.framework as Framework) || project.framework,
+          envVars: {
+            deleteMany: {}, // Clear old ones for simplicity in this demo
+            create: processedEnvVars
+          }
         }
       });
     }
