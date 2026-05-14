@@ -53,8 +53,7 @@ export default function ImportProjectPage() {
 
   const linkDatabase = async () => {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
-      const res = await fetch(`${API_BASE}/api/databases?teamId=default`);
+      const res = await fetch(`https://paas-k7nx.onrender.com/api/databases?teamId=default`);
       const data = await res.json();
       if (data.success && data.data.length > 0) {
         const db = data.data[0];
@@ -81,8 +80,7 @@ export default function ImportProjectPage() {
   const analyzeUrl = async (repoUrl: string) => {
     if (!repoUrl || !repoUrl.startsWith('https://github.com/')) return;
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
-      const res = await fetch(`${API_BASE}/api/deployments/analyze`, {
+      const res = await fetch(`https://paas-k7nx.onrender.com/api/deployments/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl })
@@ -122,8 +120,7 @@ export default function ImportProjectPage() {
     setLoading(true);
     
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
-      const response = await fetch(`${API_BASE}/api/deployments`, {
+      const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

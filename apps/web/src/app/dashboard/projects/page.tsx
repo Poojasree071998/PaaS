@@ -20,9 +20,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
-        // Assuming teamId is available or using a default for now
-        const res = await fetch(`${API_BASE}/api/projects`);
+        const res = await fetch(`https://paas-k7nx.onrender.com/api/projects`);
         const data = await res.json();
         if (data.success) {
           setProjects(data.data);

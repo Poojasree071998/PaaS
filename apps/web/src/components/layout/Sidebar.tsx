@@ -35,10 +35,7 @@ export function Sidebar() {
   useEffect(() => {
     const wakeUp = async () => {
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for Render cold starts and busy builds
-        await fetch(`${API_BASE}/health`, { signal: controller.signal }).catch(() => {});
+        await fetch(`https://paas-k7nx.onrender.com/health`, { signal: controller.signal }).catch(() => {});
         clearTimeout(timeoutId);
       } catch (e) {}
     };

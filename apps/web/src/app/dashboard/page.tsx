@@ -22,8 +22,7 @@ export default function DashboardOverview() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_VITE_API_BASE || "https://paas-k7nx.onrender.com";
-        const response = await fetch(`${API_BASE}/api/deployments`);
+        const response = await fetch(`https://paas-k7nx.onrender.com/api/deployments`);
         const data = await response.json();
         if (data.success) {
           const deps = data.data;

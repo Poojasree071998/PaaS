@@ -44,8 +44,7 @@ export default function DatabasesPage() {
 
   const fetchDatabases = async () => {
     try {
-      const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/api/databases?teamId=default`); // Simplified teamId
+      const res = await fetch(`https://paas-k7nx.onrender.com/api/databases?teamId=default`); // Simplified teamId
       const data = await res.json();
       if (data.success) {
         setDatabases(data.data);
@@ -61,8 +60,7 @@ export default function DatabasesPage() {
     if (!newName) return;
     setCreating(true);
     try {
-      const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/api/databases`, {
+      const res = await fetch(`https://paas-k7nx.onrender.com/api/databases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -90,8 +88,7 @@ export default function DatabasesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this database? All data will be lost.')) return;
     try {
-      const apiUrl = getApiUrl();
-      await fetch(`${apiUrl}/api/databases/${id}`, { method: 'DELETE' });
+      await fetch(`https://paas-k7nx.onrender.com/api/databases/${id}`, { method: 'DELETE' });
       setDatabases(databases.filter(db => db.id !== id));
     } catch (error) {
       alert('Failed to delete database.');
