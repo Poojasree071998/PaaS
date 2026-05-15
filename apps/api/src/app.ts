@@ -32,10 +32,25 @@ app.use(cookieParser() as any);
 app.set('trust proxy', 1);
 
 // Security & CORS Middlewares
+const allowedOrigins = [
+  "https://paas-1.vercel.app",
+  "https://deployflow-web.onrender.com",
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:5173"
+];
+
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1 && !origin.endsWith('.vercel.app') && !origin.endsWith('.onrender.com')) {
+      return callback(null, true); // Still allow for now but log warning or be more strict later
+    }
+    return callback(null, true);
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-API-Key"],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204

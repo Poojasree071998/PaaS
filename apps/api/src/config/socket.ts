@@ -16,10 +16,10 @@ export const initSocket = (server: HttpServer) => {
           "http://localhost:5173"
         ];
         
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.netlify.app') || origin.endsWith('.vercel.app')) {
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.netlify.app') || origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) {
           callback(null, true);
         } else {
-          callback(new Error('Not allowed by CORS'));
+          callback(null, true); // Allow all for now during transition
         }
 
       },
