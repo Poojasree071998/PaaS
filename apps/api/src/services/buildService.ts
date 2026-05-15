@@ -238,8 +238,8 @@ export class BuildService {
         await this.log(deploymentId, `  ↳ Clone complete.`, LogLevel.INFO);
       } catch (e: any) {
         if (e.message.includes('ENOENT') || e.message.includes('git not found')) {
-          await this.log(deploymentId, `⚠️ System 'git' not found. Falling back to High-Speed API Download...`, LogLevel.WARN);
-          await this.downloadGithubRepo(deployment.project.repoUrl, buildDir, deploymentId);
+          await BuildService.log(deploymentId, `⚠️ System 'git' not found. Falling back to High-Speed API Download...`, LogLevel.WARN);
+          await BuildService.downloadGithubRepo(deployment.project.repoUrl, buildDir, deploymentId);
         } else {
           throw new Error(`Failed to clone repository: ${e.message}`);
         }
@@ -501,7 +501,7 @@ export class BuildService {
     } catch (e) {}
   }
 
-  private async downloadGithubRepo(repoUrl: string, targetDir: string, deploymentId: string) {
+  private static async downloadGithubRepo(repoUrl: string, targetDir: string, deploymentId: string) {
     try {
       // Convert github.com/user/repo to api.github.com/repos/user/repo/zipball
       const parts = repoUrl.replace('https://github.com/', '').split('/');
@@ -509,7 +509,7 @@ export class BuildService {
       const repo = parts[1].replace('.git', '');
       const zipUrl = `https://github.com/${user}/${repo}/archive/refs/heads/main.zip`;
       
-      await this.log(deploymentId, `  ↳ Downloading source from ${zipUrl}...`, LogLevel.INFO);
+      await BuildService.log(deploymentId, `  ↳ Downloading source from ${zipUrl}...`, LogLevel.INFO);
       
       const response = await axios({
         method: 'get',
@@ -517,13 +517,13 @@ export class BuildService {
         responseType: 'arraybuffer'
       });
 
-      const zip = new AdmZip(Buffer.from(response.data));
+      const zip = new AdmZip(Buffer.from(response.data as any));
       const zipEntries = zip.getEntries();
       
       // The first entry is usually the root folder name in the zip
       const rootFolderName = zipEntries[0].entryName.split('/')[0];
       
-      await this.log(deploymentId, `  ↳ Extracting files...`, LogLevel.INFO);
+      await BuildService.log(deploymentId, `  ↳ Extracting files...`, LogLevel.INFO);
       zip.extractAllTo(targetDir, true);
 
       // Move files up if they are nested in a subfolder (which GitHub Zips are)
@@ -541,7 +541,7 @@ export class BuildService {
         await fsPromises.rm(extractedPath, { recursive: true, force: true });
       }
 
-      await this.log(deploymentId, `✅ Source downloaded and extracted successfully via API fallback.`, LogLevel.INFO);
+      await BuildService.log(deploymentId, `✅ Source downloaded and extracted successfully via API fallback.`, LogLevel.INFO);
     } catch (e: any) {
       throw new Error(`Fallback download failed: ${e.message}. Ensure the repository is public and branch 'main' exists.`);
     }

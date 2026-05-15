@@ -16,6 +16,8 @@ export const analyzeProject = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+export const triggerDeploy = async (req: Request, res: Response, next: NextFunction) => {
+  try {
     const { repoUrl, buildCommand, branch, rootDirectory, envVars } = req.body;
     const userId = req.user!.id;
     
@@ -195,6 +197,8 @@ export const rollbackDeployment = async (req: Request, res: Response, next: Next
   return promoteDeployment(req, res, next);
 };
 
+export const promoteDeployment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
     const { deploymentId } = req.params;
     
     const deployment = await prisma.deployment.findFirst({
@@ -236,6 +240,8 @@ export const getChecks = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+export const getDeploymentStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
     const { deploymentId } = req.params;
     
     // Verify ownership
@@ -264,6 +270,7 @@ export const getChecks = async (req: Request, res: Response, next: NextFunction)
 
 export const deleteDeployment = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { deploymentId } = req.params;
     // 1. Verify ownership
     const deployment = await prisma.deployment.findFirst({
       where: { id: deploymentId, userId: req.user!.id }
