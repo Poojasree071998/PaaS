@@ -100,7 +100,7 @@ export class BuildService {
     }
 
     const staticFrameworks: Framework[] = [Framework.REACT, Framework.VUE, Framework.SVELTE, Framework.ANGULAR, Framework.STATIC, Framework.ASTRO];
-    const items = fs.readdirSync(workingDir);
+    const items = fs.existsSync(workingDir) ? fs.readdirSync(workingDir) : [];
     const isStatic = staticFrameworks.includes(deployment.project.framework) && !items.includes('backend') && !items.includes('api');
 
     if (isStatic) {
@@ -149,7 +149,10 @@ export class BuildService {
 
     if (!deployment) return;
 
-    const buildDir = path.resolve(process.cwd(), 'temp-builds', deployment.projectId);
+    // Use /tmp for builds on Render if possible, or ensure path is absolute and sanitized
+    const isRender = process.env.RENDER === 'true';
+    const rootBuildDir = isRender ? '/tmp/deployflow-builds' : path.resolve(process.cwd(), 'temp-builds');
+    const buildDir = path.join(rootBuildDir, deployment.projectId);
     const isRecovery = deployment.status === DeploymentStatus.READY;
     
     if (isRecovery && fs.existsSync(buildDir)) {
@@ -193,31 +196,56 @@ export class BuildService {
       if (process.platform === 'win32') await new Promise(resolve => setTimeout(resolve, 2000));
 
       await prisma.deployment.update({ where: { id: deploymentId }, data: { status: DeploymentStatus.BUILDING } });
-      getIO().to(`deployment:${deploymentId}`).emit('deployment:status', DeploymentStatus.BUILDING);
-
       await this.log(deploymentId, `[1/4] 📥 Fetching updates...`, LogLevel.INFO);
-      if (!fs.existsSync(buildDir)) await fsPromises.mkdir(buildDir, { recursive: true });
       
-      const git = simpleGit();
-      if (!fs.existsSync(path.join(buildDir, '.git'))) {
-        await Promise.race([
-          git.clone(deployment.project.repoUrl, buildDir),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timeout: Repository may be private or too large')), 30000))
-        ]);
-      } else {
+      try {
+        if (!fs.existsSync(rootBuildDir)) {
+          await fsPromises.mkdir(rootBuildDir, { recursive: true });
+        }
+        if (!fs.existsSync(buildDir)) {
+          await fsPromises.mkdir(buildDir, { recursive: true });
+        }
+      } catch (e: any) {
+        throw new Error(`Failed to create build directory: ${e.message}`);
+      }
 
+      if (!deployment.project.repoUrl) throw new Error('Repository URL is empty.');
+
+      const git = simpleGit();
+      
+      // Verify git installation
+      try {
+        await git.version();
+      } catch (e) {
+        throw new Error('Git command not found in environment.');
+      }
+
+      if (!fs.existsSync(path.join(buildDir, '.git'))) {
+        await this.log(deploymentId, `  ↳ Cloning repository...`, LogLevel.INFO);
+        await git.clone(deployment.project.repoUrl, buildDir);
+        await this.log(deploymentId, `  ↳ Clone complete.`, LogLevel.INFO);
+      } else {
+        await this.log(deploymentId, `  ↳ Pulling latest changes...`, LogLevel.INFO);
         await git.cwd(buildDir).reset(['--hard']).pull();
       }
 
-      const pkgPath = path.join(buildDir, 'package.json');
       const port = await this.findAvailablePort();
       const env = await this.generateEnv(deployment, port);
       env.NODE_ENV = 'development';
 
+      // Resolve working directory (respects rootDirectory setting)
       let workingDir = buildDir;
       if (deployment.project.rootDirectory && !['./', '/', ''].includes(deployment.project.rootDirectory.trim())) {
-        workingDir = path.join(buildDir, deployment.project.rootDirectory.replace(/^[\/\\]+/, '').replace(/^\.\//, ''));
+        const candidate = path.join(buildDir, deployment.project.rootDirectory.replace(/^[\/\\]+/, '').replace(/^\.\//,  ''));
+        if (fs.existsSync(candidate)) {
+          workingDir = candidate;
+          await this.log(deploymentId, `  ↳ Root directory resolved: ${workingDir}`, LogLevel.INFO);
+        } else {
+          await this.log(deploymentId, `⚠️ Root directory '${deployment.project.rootDirectory}' not found in repo — falling back to repo root.`, LogLevel.WARN);
+        }
       }
+
+      const pkgPath = path.join(workingDir, 'package.json');
 
       const syncPath = (dir: string) => {
         env.PATH = `${path.join(dir, 'node_modules', '.bin')}${path.delimiter}${process.env.PATH}`;
