@@ -8,7 +8,7 @@ import {
   Plus, 
   ExternalLink, 
   GitBranch, 
-  Clock,
+  Timer,
   ArrowUpRight,
   Search
 } from 'lucide-react';
@@ -119,7 +119,7 @@ export default function ProjectsPage() {
                     {project.repoBranch}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
+                    <Timer className="w-3.5 h-3.5" />
                     {latestDeploy ? formatDistanceToNow(new Date(latestDeploy.createdAt), { addSuffix: true }) : 'N/A'}
                   </div>
                   <div className="ml-auto">

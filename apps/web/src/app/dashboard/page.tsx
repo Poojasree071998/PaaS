@@ -8,7 +8,7 @@ import {
   Activity, 
   Box, 
   Zap,
-  Clock,
+  Timer,
   AlertCircle,
   Loader2,
   ChevronRight,
@@ -123,7 +123,7 @@ export default function DashboardOverview() {
                     item.status === 'ERROR' ? 'bg-rose-500/10 text-rose-500 group-hover:bg-rose-500 group-hover:text-white' : 
                     'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'
                   }`}>
-                    {item.status === 'READY' ? <CheckCircleIcon className="w-6 h-6" /> : 
+                    {item.status === 'READY' ? <Activity className="w-6 h-6" /> : 
                      item.status === 'ERROR' ? <AlertCircle className="w-6 h-6" /> : <Loader2 className="w-6 h-6 animate-spin" />}
                   </div>
                   <div className="flex-1">
@@ -132,7 +132,7 @@ export default function DashboardOverview() {
                       <span className="text-[9px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 text-zinc-500 uppercase font-black tracking-widest">production</span>
                     </div>
                     <div className="text-xs text-zinc-500 flex items-center gap-2">
-                      <Clock className="w-3 h-3" /> {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                      <Timer className="w-3 h-3" /> {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                     </div>
                   </div>
                   <div className="text-right">
@@ -188,13 +188,5 @@ export default function DashboardOverview() {
         </div>
       </div>
     </div>
-  );
-}
-
-function CheckCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
   );
 }
