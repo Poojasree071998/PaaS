@@ -281,7 +281,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                     </div>
                     <p className="text-zinc-400 font-medium">
                       {status === 'READY' ? 'Your latest changes are now live globally.' : 
-                       status === 'ERROR' ? 'The build process encountered an error.' : 
+                       status === 'ERROR' ? (deployment?.errorMessage || 'The build process encountered an error.') : 
                        `Executing Step ${currentStep} of 4...`}
                     </p>
                   </div>

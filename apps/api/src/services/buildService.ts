@@ -370,22 +370,46 @@ export class BuildService {
       // --- FINAL HARDENING: Post-Build Health Guard with Grace Period ---
       await new Promise(resolve => setTimeout(resolve, 5000));
       
-      const hasAssets = ['frontend/dist', 'frontend/build', 'dist', 'build', 'public', 'web/dist', 'web/build'].some(root => {
-        const p = path.join(workingDir, root);
-        return fs.existsSync(p) && fs.readdirSync(p).length > 0;
-      });
+      const assetFolders = ['dist', 'build', 'out', 'output', 'public', 'frontend/dist', 'frontend/build', 'web/dist', 'web/build'];
+      let foundFolder = '';
+      
+      for (const folder of assetFolders) {
+        const p = path.join(workingDir, folder);
+        if (fs.existsSync(p)) {
+          const files = fs.readdirSync(p);
+          if (files.length > 0) {
+            foundFolder = folder;
+            break;
+          }
+        }
+      }
       
       const isAlive = BuildService.isProcessRunning(deploymentId);
+      const isStatic = ['REACT', 'STATIC', 'ASTRO', 'VUE', 'SVELTE', 'ANGULAR', 'NEXTJS'].includes(deployment.project.framework) || !!foundFolder;
       
-      if (!hasAssets && !isAlive) {
-        throw new Error('Deployment Health Check Failed: No output assets found and backend failed to start.');
+      if (!foundFolder && !isAlive && !isStatic) {
+        // Log directory structure to help debug
+        try {
+          const files = fs.readdirSync(workingDir);
+          await this.log(deploymentId, `❌ Health Check Failed. Contents of ${workingDir}: ${files.join(', ')}`, LogLevel.ERROR);
+        } catch (e) {}
+        throw new Error(`Deployment Health Check Failed: No output assets found in (${assetFolders.join(', ')}) and no backend process is running.`);
+      }
+
+      if (foundFolder) {
+        await this.log(deploymentId, `✅ Assets verified in /${foundFolder}`, LogLevel.INFO);
       }
       
       await prisma.deployment.update({
         where: { id: deploymentId },
         data: { 
           status: DeploymentStatus.READY,
-          url: projectUrl
+          readyAt: new Date(),
+          url: projectUrl,
+          meta: {
+            ...(deployment.meta as any || {}),
+            staticFolder: foundFolder || null
+          }
         }
       });
 
