@@ -18,17 +18,21 @@ export interface AnalysisResult {
 
 export class AnalysisService {
   static async analyzeRepository(repoUrl: string): Promise<AnalysisResult> {
-    const tempDir = path.join(process.cwd(), 'temp-analysis', Math.random().toString(36).slice(7));
+    const isRender = process.env.RENDER === 'true';
+    const baseTempDir = isRender ? '/tmp' : path.join(process.cwd(), 'temp-analysis');
+    const tempDir = path.join(baseTempDir, Math.random().toString(36).slice(7));
     
     try {
       if (!fs.existsSync(tempDir)) await fsPromises.mkdir(tempDir, { recursive: true });
 
       // Shallow clone with timeout to avoid hanging on private repos
+      console.log(`[Analysis] Cloning ${repoUrl} into ${tempDir}...`);
       const git = simpleGit();
       await Promise.race([
         git.clone(repoUrl, tempDir, ['--depth', '1']),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timeout: Repository may be private or too large')), 15000))
       ]);
+      console.log(`[Analysis] Clone successful.`);
 
 
       const result: AnalysisResult = {

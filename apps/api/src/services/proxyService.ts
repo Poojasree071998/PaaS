@@ -119,8 +119,10 @@ export class ProxyService {
       }
       debugLog(`CleanPath: "${cleanPath}"`);
 
-      // 1. Resolve Root Directory
-      const buildRoot = path.join(process.cwd(), 'temp-builds', projectId);
+      // 1. Resolve Root Directory (Environment-Aware)
+      const isRender = process.env.RENDER === 'true';
+      const baseTempDir = isRender ? '/tmp' : path.join(process.cwd(), 'temp-builds');
+      const buildRoot = path.join(baseTempDir, 'deployflow-work', projectId);
       
       // --- AUTO-RECOVERY ---
       if (!fs.existsSync(buildRoot)) {
@@ -138,7 +140,7 @@ export class ProxyService {
 
       // --- SMART PROCESS RE-LINKING ---
       let targetPort = BuildService.getRunningPort(id);
-      if (!targetPort && deployment.status === 'READY' && !BuildService.isBuilding(id)) {
+      if (!targetPort && deployment.status === 'READY' && !BuildService.isBuilding(projectId)) {
         logger.info(`Auto-waking deployment ${id}`);
         BuildService.runBuild(id).catch(() => {});
         

@@ -1,5 +1,7 @@
 "use client";
 
+// Force Fresh Build: v2.4.1-projects-fix
+
 export const dynamic = "force-dynamic";
 
 import Link from 'next/link';
@@ -15,7 +17,7 @@ import {
 import { apiFetch } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 
-export default function ProjectsPage() {
+export default function DashboardProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

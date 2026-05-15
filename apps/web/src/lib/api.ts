@@ -53,5 +53,13 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   }
 }
 
-export const getSocketUrl = () => "https://paas-k7nx.onrender.com";
+export const getSocketUrl = () => {
+  if (typeof window !== 'undefined') {
+    // If NEXT_PUBLIC_API_URL is set, use it. Otherwise, use the current origin (Vercel Proxy)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (apiUrl) return apiUrl;
+    return window.location.origin;
+  }
+  return "https://paas-k7nx.onrender.com";
+};
 export const getApiUrl = () => API_BASE;

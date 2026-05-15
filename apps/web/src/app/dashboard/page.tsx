@@ -1,5 +1,7 @@
 "use client";
 
+// Force Fresh Build: v2.4.1-dashboard-fix
+
 export const dynamic = "force-dynamic";
 
 import { 
@@ -21,7 +23,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 
-export default function DashboardOverview() {
+export default function DashboardPage() {
   const [stats, setStats] = useState({ projects: 0, deployments: 0, uptime: '99.9%' });
   const [recentDeployments, setRecentDeployments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

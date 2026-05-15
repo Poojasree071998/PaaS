@@ -41,9 +41,9 @@ app.get('/health', (req, res) => {
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
   
-  socket.on('subscribe', (deploymentId: string) => {
+  socket.on('join:deployment', (deploymentId: string) => {
     socket.join(`deployment:${deploymentId}`);
-    console.log(`Socket ${socket.id} subscribed to deployment:${deploymentId}`);
+    console.log(`Socket ${socket.id} joined deployment:${deploymentId}`);
   });
 
   socket.on('disconnect', () => {

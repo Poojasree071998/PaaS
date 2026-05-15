@@ -56,7 +56,7 @@ export class BuildService {
     });
 
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
-    const baseUrl = isProduction ? 'https://paas-k7nx.onrender.com' : 'http://localhost:4000';
+    const baseUrl = process.env.API_URL || (isProduction ? 'https://paas-k7nx.onrender.com' : 'http://localhost:4000');
     const publicUrl = `${baseUrl}/live/${deployment.id}`;
     if (!env.API_URL && !env.BACKEND_URL) {
       env.API_URL = publicUrl;
@@ -386,7 +386,7 @@ export class BuildService {
       }
 
       const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
-      const baseUrl = isProduction ? 'https://paas-k7nx.onrender.com' : 'http://localhost:4000';
+      const baseUrl = process.env.API_URL || (isProduction ? 'https://paas-k7nx.onrender.com' : 'http://localhost:4000');
       const projectUrl = `${baseUrl}/live/${deploymentId}/`;
       await this.startRuntime(deploymentId, deployment, workingDir);
 
