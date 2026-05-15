@@ -280,11 +280,20 @@ export class BuildService {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         const isMonorepo = !!pkg.workspaces;
         const installCmd = (isMonorepo || !fs.existsSync(path.join(workingDir, 'package-lock.json'))) ? 'install' : 'ci';
+        let installSuccess = false;
         try {
           await this.executeLiveCommand(deploymentId, `npm install`, [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
-        } catch (err) {
-          await this.log(deploymentId, `⚠️ Standard sync failed. Retrying with --legacy-peer-deps...`, LogLevel.WARN);
-          await this.executeLiveCommand(deploymentId, `npm install (legacy)`, [installCmd, '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], workingDir, env, 1200000);
+          installSuccess = true;
+        } catch (err: any) {
+          await this.log(deploymentId, `⚠️ Standard sync failed (Dependency Conflict). Retrying with --legacy-peer-deps...`, LogLevel.WARN);
+          try {
+            await this.executeLiveCommand(deploymentId, `npm install (legacy-mode)`, [installCmd, '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], workingDir, env, 1200000);
+            installSuccess = true;
+          } catch (err2) {
+            await this.log(deploymentId, `⚠️ Legacy mode failed. Attempting final --force sync...`, LogLevel.WARN);
+            await this.executeLiveCommand(deploymentId, `npm install (force-mode)`, [installCmd, '--prefer-offline', '--no-audit', '--no-fund', '--force'], workingDir, env, 1200000);
+            installSuccess = true;
+          }
         }
       } else {
         await this.log(deploymentId, `[2/4] ⏩ No package.json found. Skipping dependencies sync.`, LogLevel.INFO);
