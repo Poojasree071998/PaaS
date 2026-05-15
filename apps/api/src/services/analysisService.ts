@@ -28,11 +28,16 @@ export class AnalysisService {
       // Shallow clone with timeout to avoid hanging on private repos
       console.log(`[Analysis] Cloning ${repoUrl} into ${tempDir}...`);
       const git = simpleGit();
-      await Promise.race([
-        git.clone(repoUrl, tempDir, ['--depth', '1']),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timeout: Repository may be private or too large')), 15000))
-      ]);
-      console.log(`[Analysis] Clone successful.`);
+      try {
+        await Promise.race([
+          git.clone(repoUrl, tempDir, ['--depth', '1']),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Analysis timeout: Repository may be private or too large')), 15000))
+        ]);
+        console.log(`[Analysis] Clone successful.`);
+      } catch (err: any) {
+        console.error(`[Analysis Error] Failed to clone ${repoUrl}:`, err.message);
+        throw new Error(`Failed to access repository. Ensure it is public and the URL is correct. (Detail: ${err.message})`);
+      }
 
 
       const result: AnalysisResult = {

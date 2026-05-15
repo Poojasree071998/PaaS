@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, use } from 'react';
 import { io } from 'socket.io-client';
 import { 
   ChevronLeft, 
@@ -31,8 +31,8 @@ interface Log {
   timestamp: string;
 }
 
-export default function DeploymentPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function DeploymentPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [logs, setLogs] = useState<Log[]>([]);
   const [status, setStatus] = useState('QUEUED');
   const [loading, setLoading] = useState(true);

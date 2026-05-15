@@ -7,7 +7,7 @@ import bcrypt from 'bcrypt';
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 0. LOCAL DEVELOPMENT BYPASS
+    console.log(`[Auth] Hostname: ${req.hostname}, Method: ${req.method}, Path: ${req.path}`);
     // Automatically log in as the first user if running locally to avoid 401s during demo
     if (req.hostname === 'localhost' || req.hostname === '127.0.0.1') {
       const user = await prisma.user.findFirst();
@@ -22,6 +22,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      console.warn(`[Auth Warning] Missing Authorization header for ${req.path} from ${req.hostname}`);
+    }
     
     // 1. Check for Bearer Token (JWT)
     if (authHeader && authHeader.startsWith('Bearer ')) {
