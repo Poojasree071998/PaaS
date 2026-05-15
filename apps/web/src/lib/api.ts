@@ -55,9 +55,16 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 
 export const getSocketUrl = () => {
   if (typeof window !== 'undefined') {
-    // If NEXT_PUBLIC_API_URL is set, use it. Otherwise, use the current origin (Vercel Proxy)
+    // If NEXT_PUBLIC_API_URL is set, use it. 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (apiUrl) return apiUrl;
+    
+    // On Vercel production, we MUST use the direct Render URL because Vercel rewrites don't support WebSockets
+    if (window.location.hostname.includes('vercel.app')) {
+      return "https://paas-k7nx.onrender.com";
+    }
+    
+    // Otherwise (localhost), use current origin
     return window.location.origin;
   }
   return "https://paas-k7nx.onrender.com";
