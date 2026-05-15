@@ -14,6 +14,14 @@
     {
       "source": "/socket.io/:path*",
       "destination": "https://paas-k7nx.onrender.com/socket.io/:path*"
+    },
+    {
+      "source": "/live/:path*",
+      "destination": "https://paas-k7nx.onrender.com/live/:path*"
+    },
+    {
+      "source": "/p/:path*",
+      "destination": "https://paas-k7nx.onrender.com/p/:path*"
     }
   ]
 }
