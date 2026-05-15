@@ -1,0 +1,19 @@
+{
+  "buildCommand": "cd apps/web && npm run build",
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/health",
+      "destination": "https://paas-k7nx.onrender.com/health"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://paas-k7nx.onrender.com/api/:path*"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "https://paas-k7nx.onrender.com/socket.io/:path*"
+    }
+  ]
+}
