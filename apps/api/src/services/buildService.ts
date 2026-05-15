@@ -294,23 +294,26 @@ export class BuildService {
       // Subfolders
       const subfolders = ['backend', 'frontend', 'api', 'web', 'client', 'server'];
       const detected: string[] = [];
+      const isActuallyStatic = ['REACT', 'STATIC', 'ASTRO', 'VUE', 'SVELTE'].includes(deployment.project.framework);
+
       for (const folder of subfolders) {
         const subPath = path.join(workingDir, folder);
         if (fs.existsSync(path.join(subPath, 'package.json'))) {
           detected.push(folder);
           await this.log(deploymentId, `📦 Subfolder '${folder}' detected. Synchronizing...`, LogLevel.INFO);
           try {
-            await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], subPath, env, 600000);
+            await this.executeLiveCommand(deploymentId, `npm install (subfolder: ${folder})`, ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], subPath, env, 600000);
             
-            // --- RECURSIVE BUILD: Ensure subfolders are also built ---
+            // --- SMART RECURSIVE BUILD: Only build subfolders if they aren't extra stuff ---
             const subPkg = JSON.parse(fs.readFileSync(path.join(subPath, 'package.json'), 'utf8'));
-            if (subPkg.scripts?.build) {
+            if (subPkg.scripts?.build && !isActuallyStatic) {
               await this.log(deploymentId, `🔨 Building subfolder '${folder}'...`, LogLevel.INFO);
-              await this.executeLiveCommand(deploymentId, 'npm run build', [], subPath, env, 600000);
+              await this.executeLiveCommand(deploymentId, `npm run build (subfolder: ${folder})`, ['run', 'build'], subPath, env, 600000);
+            } else if (isActuallyStatic) {
+              await this.log(deploymentId, `⏩ Skipping build for '${folder}' (Project is ${deployment.project.framework})`, LogLevel.INFO);
             }
           } catch (e) {
-            await this.cleanupStaleProcesses(deployment.projectId);
-            await this.executeLiveCommand(deploymentId, 'npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], subPath, env, 600000);
+            await this.log(deploymentId, `⚠️ Syncing '${folder}' failed, but continuing...`, LogLevel.WARN);
           }
         }
       }
@@ -553,13 +556,37 @@ export class BuildService {
     return error;
   }
 
-  private static async executeLiveCommand(deploymentId: string, command: string, args: string[], cwd: string, env: any, timeoutMs: number) {
+  private static async executeLiveCommand(deploymentId: string, commandLabel: string, args: string[], cwd: string, env: any, timeoutMs: number) {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, args, { cwd, shell: true, env: { ...process.env, ...env } });
-      const t = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('Timeout')); }, timeoutMs);
+      // Split commandLabel if it's a full command string
+      let cmd = commandLabel;
+      let finalArgs = args;
+      if (commandLabel.includes('npm run build')) {
+        cmd = 'npm';
+        finalArgs = ['run', 'build', ...args];
+      } else if (commandLabel.includes('npm')) {
+        cmd = 'npm';
+      }
+
+      const child = spawn(cmd, finalArgs, { cwd, shell: true, env: { ...process.env, ...env } });
+      const t = setTimeout(() => { 
+        child.kill('SIGKILL'); 
+        reject(new Error(`Command ${commandLabel} timed out after ${timeoutMs/1000}s`)); 
+      }, timeoutMs);
+
+      // Heartbeat to keep logs alive
+      const heartbeat = setInterval(() => {
+        this.log(deploymentId, `⏳ Still executing: ${commandLabel}...`, LogLevel.DEBUG).catch(() => {});
+      }, 30000);
+
       child.stdout.on('data', d => d.toString().split('\n').forEach((l: string) => l.trim() && this.log(deploymentId, l.trim(), LogLevel.INFO)));
       child.stderr.on('data', d => d.toString().split('\n').forEach((l: string) => l.trim() && this.log(deploymentId, l.trim(), LogLevel.WARN)));
-      child.on('close', c => { clearTimeout(t); c === 0 ? resolve(true) : reject(new Error(`Exit ${c}`)); });
+      
+      child.on('close', c => { 
+        clearTimeout(t); 
+        clearInterval(heartbeat);
+        c === 0 ? resolve(true) : reject(new Error(`Command ${commandLabel} exited with code ${c}`)); 
+      });
     });
   }
 }
