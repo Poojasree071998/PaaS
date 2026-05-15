@@ -177,7 +177,7 @@ export default function Home() {
             </button>
             <div className="flex items-center gap-2 text-emerald-500 font-bold uppercase text-[10px] tracking-widest">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              All Systems Operational
+              All Systems Operational — Build: 20260515-2200
             </div>
           </div>
         </div>
