@@ -228,15 +228,19 @@ export class BuildService {
 
       // Install
       await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies...`, LogLevel.INFO);
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      const isMonorepo = !!pkg.workspaces;
-      const installCmd = (isMonorepo || !fs.existsSync(path.join(workingDir, 'package-lock.json'))) ? 'install' : 'ci';
-      try {
-        await this.executeLiveCommand(deploymentId, 'npm', [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
-      } catch (err) {
-        await this.log(deploymentId, `⚠️ Initial sync failed (lock). Retrying with Deep Cleanup...`, LogLevel.WARN);
-        await this.cleanupStaleProcesses(deployment.projectId);
-        await this.executeLiveCommand(deploymentId, 'npm', [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        const isMonorepo = !!pkg.workspaces;
+        const installCmd = (isMonorepo || !fs.existsSync(path.join(workingDir, 'package-lock.json'))) ? 'install' : 'ci';
+        try {
+          await this.executeLiveCommand(deploymentId, 'npm', [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
+        } catch (err) {
+          await this.log(deploymentId, `⚠️ Initial sync failed (lock). Retrying with Deep Cleanup...`, LogLevel.WARN);
+          await this.cleanupStaleProcesses(deployment.projectId);
+          await this.executeLiveCommand(deploymentId, 'npm', [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
+        }
+      } else {
+        await this.log(deploymentId, `[2/4] ⏩ No package.json found. Skipping dependencies sync.`, LogLevel.INFO);
       }
 
       // Subfolders
@@ -270,7 +274,8 @@ export class BuildService {
       env.PUBLIC_URL = livePath;
       env.VITE_BASE_PATH = livePath; 
       
-      const rootPkg = JSON.parse(fs.readFileSync(path.join(workingDir, 'package.json'), 'utf8'));
+      const rootPkgPath = path.join(workingDir, 'package.json');
+      const rootPkg = fs.existsSync(rootPkgPath) ? JSON.parse(fs.readFileSync(rootPkgPath, 'utf8')) : {};
       if (rootPkg.scripts?.build || deployment.project.buildCommand) {
         await this.log(deploymentId, `[3/4] 🔨 Building project...`, LogLevel.INFO);
         let bCmd = deployment.project.buildCommand || 'npm run build';
