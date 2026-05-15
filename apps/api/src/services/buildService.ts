@@ -281,11 +281,10 @@ export class BuildService {
         const isMonorepo = !!pkg.workspaces;
         const installCmd = (isMonorepo || !fs.existsSync(path.join(workingDir, 'package-lock.json'))) ? 'install' : 'ci';
         try {
-          await this.executeLiveCommand(deploymentId, 'npm', [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
+          await this.executeLiveCommand(deploymentId, `npm install`, [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
         } catch (err) {
-          await this.log(deploymentId, `⚠️ Initial sync failed (lock). Retrying with Deep Cleanup...`, LogLevel.WARN);
-          await this.cleanupStaleProcesses(deployment.projectId);
-          await this.executeLiveCommand(deploymentId, 'npm', [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
+          await this.log(deploymentId, `⚠️ Standard sync failed. Retrying with --legacy-peer-deps...`, LogLevel.WARN);
+          await this.executeLiveCommand(deploymentId, `npm install (legacy)`, [installCmd, '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], workingDir, env, 1200000);
         }
       } else {
         await this.log(deploymentId, `[2/4] ⏩ No package.json found. Skipping dependencies sync.`, LogLevel.INFO);
