@@ -5,7 +5,7 @@ import {
   TrendingUp, 
   Users, 
   Globe, 
-  Clock, 
+  Timer, 
   ArrowUpRight, 
   ArrowDownRight,
   Filter

@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import { 
   Activity, 
   GitBranch, 
-  Clock, 
   ExternalLink, 
   CheckCircle2, 
   AlertCircle, 
@@ -158,7 +157,7 @@ export default function DeploymentsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                          <Clock className="w-3.5 h-3.5" />
+                          <Timer className="w-3.5 h-3.5" />
                           {new Date(deployment.createdAt).toLocaleDateString()}
                         </div>
                       </td>

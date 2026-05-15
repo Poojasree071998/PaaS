@@ -120,7 +120,13 @@ export default function ProjectsPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Timer className="w-3.5 h-3.5" />
-                    {latestDeploy ? formatDistanceToNow(new Date(latestDeploy.createdAt), { addSuffix: true }) : 'N/A'}
+                    {(() => {
+                      try {
+                        return latestDeploy ? formatDistanceToNow(new Date(latestDeploy.createdAt), { addSuffix: true }) : 'N/A';
+                      } catch (e) {
+                        return 'N/A';
+                      }
+                    })()}
                   </div>
                   <div className="ml-auto">
                     <span className="bg-white/5 px-2 py-1 rounded border border-white/5 uppercase tracking-tighter">

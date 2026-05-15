@@ -132,7 +132,14 @@ export default function DashboardOverview() {
                       <span className="text-[9px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 text-zinc-500 uppercase font-black tracking-widest">production</span>
                     </div>
                     <div className="text-xs text-zinc-500 flex items-center gap-2">
-                      <Timer className="w-3 h-3" /> {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                      <Timer className="w-3 h-3" /> 
+                      {(() => {
+                        try {
+                          return formatDistanceToNow(new Date(item.createdAt), { addSuffix: true });
+                        } catch (e) {
+                          return 'Just now';
+                        }
+                      })()}
                     </div>
                   </div>
                   <div className="text-right">

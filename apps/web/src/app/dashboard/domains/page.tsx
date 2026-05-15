@@ -148,7 +148,7 @@ export default function DomainsPage() {
 
   const filteredDomains = domains.filter(d => 
     d.hostname.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    d.project?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (d.project?.name && d.project.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -225,7 +225,13 @@ export default function DomainsPage() {
                             )}
                           </div>
                           <div className="text-xs text-zinc-500">
-                            {domain.createdAt ? formatDistanceToNow(new Date(domain.createdAt), { addSuffix: true }) : 'Just now'}
+                            {(() => {
+                              try {
+                                return domain.createdAt ? formatDistanceToNow(new Date(domain.createdAt), { addSuffix: true }) : 'Just now';
+                              } catch (e) {
+                                return 'Just now';
+                              }
+                            })()}
                           </div>
                         </div>
                       </div>

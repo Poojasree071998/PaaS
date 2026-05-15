@@ -16,7 +16,7 @@ import {
   Settings,
   Folder,
   Zap,
-  Clock,
+  Timer,
   ChevronRight,
   ArrowUpRight
 } from 'lucide-react';
@@ -31,8 +31,8 @@ interface Log {
   timestamp: string;
 }
 
-export default function DeploymentPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = React.use(params);
+export default function DeploymentPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const [logs, setLogs] = useState<Log[]>([]);
   const [status, setStatus] = useState('QUEUED');
   const [loading, setLoading] = useState(true);
@@ -344,7 +344,7 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                   <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">System Pipeline Logs</span>
                 </div>
                 <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
-                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Live Streaming</span>
+                  <span className="flex items-center gap-1.5"><Timer className="w-3 h-3" /> Live Streaming</span>
                 </div>
               </div>
               
