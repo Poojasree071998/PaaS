@@ -306,22 +306,26 @@ export class BuildService {
 
       for (const folder of subfolders) {
         const subPath = path.join(workingDir, folder);
-        if (fs.existsSync(path.join(subPath, 'package.json'))) {
+        const subPkgPath = path.join(subPath, 'package.json');
+        
+        if (fs.existsSync(subPkgPath)) {
           detected.push(folder);
           await this.log(deploymentId, `📦 Subfolder '${folder}' detected. Synchronizing...`, LogLevel.INFO);
           try {
-            await this.executeLiveCommand(deploymentId, `npm install (subfolder: ${folder})`, ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], subPath, env, 600000);
-            
-            // --- SMART RECURSIVE BUILD: Only build subfolders if they aren't extra stuff ---
-            const subPkg = JSON.parse(fs.readFileSync(path.join(subPath, 'package.json'), 'utf8'));
-            if (subPkg.scripts?.build && !isActuallyStatic) {
-              await this.log(deploymentId, `🔨 Building subfolder '${folder}'...`, LogLevel.INFO);
-              await this.executeLiveCommand(deploymentId, `npm run build (subfolder: ${folder})`, ['run', 'build'], subPath, env, 600000);
-            } else if (isActuallyStatic) {
-              await this.log(deploymentId, `⏩ Skipping build for '${folder}' (Project is ${deployment.project.framework})`, LogLevel.INFO);
+            // Final verification before running npm
+            if (fs.existsSync(subPkgPath)) {
+              await this.executeLiveCommand(deploymentId, `npm install (subfolder: ${folder})`, ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], subPath, env, 600000);
+              
+              const subPkg = JSON.parse(fs.readFileSync(subPkgPath, 'utf8'));
+              if (subPkg.scripts?.build && !isActuallyStatic) {
+                await this.log(deploymentId, `🔨 Building subfolder '${folder}'...`, LogLevel.INFO);
+                await this.executeLiveCommand(deploymentId, `npm run build (subfolder: ${folder})`, ['run', 'build'], subPath, env, 600000);
+              } else if (isActuallyStatic) {
+                await this.log(deploymentId, `⏩ Skipping build for '${folder}' (Project is ${deployment.project.framework})`, LogLevel.INFO);
+              }
             }
-          } catch (e) {
-            await this.log(deploymentId, `⚠️ Syncing '${folder}' failed, but continuing...`, LogLevel.WARN);
+          } catch (e: any) {
+            await this.log(deploymentId, `⚠️ Subfolder '${folder}' sync failed: ${e.message}. Continuing with main build...`, LogLevel.WARN);
           }
         }
       }
