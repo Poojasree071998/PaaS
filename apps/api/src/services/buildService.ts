@@ -227,8 +227,12 @@ export class BuildService {
       syncPath(workingDir);
 
       // Install
-      await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies...`, LogLevel.INFO);
-      if (fs.existsSync(pkgPath)) {
+      const isStaticNoPackage = deployment.project.framework === Framework.STATIC && !fs.existsSync(pkgPath);
+
+      if (isStaticNoPackage) {
+        await this.log(deploymentId, `[2/4] ⏩ Static site with no package.json detected. Skipping install & build.`, LogLevel.INFO);
+      } else if (fs.existsSync(pkgPath)) {
+        await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies...`, LogLevel.INFO);
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         const isMonorepo = !!pkg.workspaces;
         const installCmd = (isMonorepo || !fs.existsSync(path.join(workingDir, 'package-lock.json'))) ? 'install' : 'ci';
@@ -276,7 +280,7 @@ export class BuildService {
       
       const rootPkgPath = path.join(workingDir, 'package.json');
       const rootPkg = fs.existsSync(rootPkgPath) ? JSON.parse(fs.readFileSync(rootPkgPath, 'utf8')) : {};
-      if (rootPkg.scripts?.build || deployment.project.buildCommand) {
+      if (!isStaticNoPackage && (rootPkg.scripts?.build || deployment.project.buildCommand)) {
         await this.log(deploymentId, `[3/4] 🔨 Building project...`, LogLevel.INFO);
         let bCmd = deployment.project.buildCommand || 'npm run build';
         
@@ -431,7 +435,7 @@ export class BuildService {
 
   private static translateError(error: string): string {
     if (error.includes('128') || error.includes('not found')) return 'Repository not found. Ensure it is public.';
-    if (error.includes('ENOENT')) return 'Build file not found. Check root directory.';
+    if (error.includes('ENOENT')) return 'A required file or directory was not found. Check your root directory setting and ensure the repository is accessible.';
     return error;
   }
 
