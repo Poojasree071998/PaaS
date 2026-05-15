@@ -2,7 +2,9 @@
 
 // PROXY MODE (RELATIVE PATHS)
 // We use relative paths so that the Vercel Proxy (vercel.json) can intercept and forward calls to Render.
-export const API_BASE = "";
+export const API_BASE = (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) 
+  ? "https://paas-k7nx.onrender.com" 
+  : "";
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;

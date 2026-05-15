@@ -59,12 +59,12 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-zinc-500 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Command Center</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">Global Command Center</span>
             <div className="w-1 h-1 rounded-full bg-zinc-700" />
-            <span className="text-[10px] font-bold text-zinc-600 italic">v2.4.0</span>
+            <span className="text-[10px] font-bold text-zinc-600 italic">v3.0.0-PRO</span>
           </div>
-          <h1 className="text-5xl font-black tracking-tighter text-white">Dashboard</h1>
-          <p className="text-zinc-400 mt-2 text-lg">Welcome back. Your platform is operating at <span className="text-emerald-400 font-bold">100% capacity</span>.</p>
+          <h1 className="text-6xl font-black tracking-tighter text-white">Console</h1>
+          <p className="text-zinc-400 mt-2 text-lg max-w-2xl">Your infrastructure is operating at <span className="text-emerald-400 font-bold">100% capacity</span>. All systems are nominal.</p>
         </div>
         <Link href="/dashboard/new" className="group relative px-8 py-3 bg-white text-black font-black rounded-2xl hover:bg-zinc-200 transition-all flex items-center gap-3 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-white/50 to-blue-500/0 -translate-x-full group-hover:animate-shimmer" />
@@ -112,7 +112,16 @@ export default function DashboardPage() {
           
           <div className="rounded-3xl border border-white/5 bg-white/[0.02] overflow-hidden divide-y divide-white/5">
             {recentDeployments.length === 0 ? (
-              <div className="p-20 text-center text-zinc-600 italic">No activity detected yet.</div>
+              <div className="p-20 text-center flex flex-col items-center justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6">
+                  <Activity className="w-8 h-8 text-zinc-700" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">No active pipelines</h3>
+                <p className="text-zinc-500 text-sm max-w-xs mb-8">Deploy your first repository to see real-time performance metrics and deployment logs.</p>
+                <Link href="/dashboard/new" className="text-blue-500 font-bold hover:text-blue-400 flex items-center gap-2">
+                  Launch a new project <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
             ) : (
               recentDeployments.map((item, i) => (
                 <Link 

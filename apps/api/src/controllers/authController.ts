@@ -7,11 +7,13 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
   try {
     let { email, password, name } = req.body;
 
-    // Enforce fixed credential format
+    // Enforce name capitalization
     if (name) {
-      // Name: The first letter must always be capitalized.
       name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-      // Password: The password should always be the user's name in lowercase.
+    }
+    
+    // Default password to name in lowercase ONLY if not provided
+    if (name && !password) {
       password = name.toLowerCase();
     }
     
