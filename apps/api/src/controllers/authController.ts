@@ -54,7 +54,12 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    
+    // Consistent email casing
+    if (email) {
+      email = email.toLowerCase();
+    }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !(await AuthService.comparePassword(password, user.password))) {
