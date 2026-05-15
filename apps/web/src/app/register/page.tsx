@@ -21,11 +21,19 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
 
+    // Pre-format for consistency (backend will also enforce this)
+    const formattedName = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+    const formattedPassword = name.toLowerCase();
+
     try {
       const res = await apiFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ 
+          name: formattedName, 
+          email: email.toLowerCase(), 
+          password: formattedPassword // Sending it but backend will override anyway
+        }),
       });
 
       if (res.success) {
@@ -128,20 +136,19 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 opacity-60">
                 <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest ml-1">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                   <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                    placeholder="••••••••"
-                    required
+                    type="text" 
+                    value={name ? name.toLowerCase() : ''}
+                    disabled
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white/50 cursor-not-allowed"
+                    placeholder="Auto-generated from name"
                   />
                 </div>
-                <p className="text-[10px] text-zinc-500 ml-1">Must be at least 8 characters with a number.</p>
+                <p className="text-[10px] text-zinc-500 ml-1">Your password is automatically set to your name in lowercase.</p>
               </div>
 
               <button 

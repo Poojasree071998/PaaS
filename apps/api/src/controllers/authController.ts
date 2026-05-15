@@ -5,7 +5,20 @@ import { ConflictError, UnauthorizedError, BadRequestError } from '../utils/erro
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name } = req.body;
+    let { email, password, name } = req.body;
+
+    // Enforce fixed credential format
+    if (name) {
+      // Name: The first letter must always be capitalized.
+      name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+      // Password: The password should always be the user's name in lowercase.
+      password = name.toLowerCase();
+    }
+    
+    if (email) {
+      // Email: Always lowercase for consistency
+      email = email.toLowerCase();
+    }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -126,10 +139,22 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
 
 export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, avatar } = req.body;
+    let { name, avatar } = req.body;
+    let updateData: any = { avatar };
+    
+    if (name) {
+      // Enforce capitalization on name update
+      name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+      updateData.name = name;
+      
+      // Enforce password update to match new name (per user requirement)
+      const hashedPassword = await AuthService.hashPassword(name.toLowerCase());
+      updateData.password = hashedPassword;
+    }
+
     const user = await prisma.user.update({
       where: { id: req.user!.id },
-      data: { name, avatar },
+      data: updateData,
       select: { id: true, email: true, name: true, role: true, avatar: true }
     });
     res.json({ success: true, data: user });

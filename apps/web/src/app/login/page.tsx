@@ -96,7 +96,7 @@ export default function LoginPage() {
               <div className="flex justify-between items-center ml-1">
                 <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Password</label>
                 <Link href="/forgot-password" title="Forgot Password" className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">
-                  Forgot?
+                   Help?
                 </Link>
               </div>
               <div className="relative">
@@ -110,6 +110,7 @@ export default function LoginPage() {
                   required
                 />
               </div>
+              <p className="text-[10px] text-zinc-500 ml-1">Hint: Your password is your name in lowercase.</p>
             </div>
 
             <button 
