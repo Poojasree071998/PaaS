@@ -16,33 +16,21 @@ export const analyzeProject = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const triggerDeploy = async (req: Request, res: Response, next: NextFunction) => {
-  try {
     const { repoUrl, buildCommand, branch, rootDirectory, envVars } = req.body;
+    const userId = req.user!.id;
     
-    // 1. Get or create a default user for the demo
-    let user = await prisma.user.findFirst();
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: 'admin@deployflow.app',
-          name: 'Admin User',
-          password: 'demo-only',
-        }
-      });
-    }
-    const userId = user.id;
-
-    // 2. Find or create a team
+    // 1. Find or create a team for the user
     let team = await prisma.team.findFirst({ where: { ownerId: userId } });
     if (!team) {
       team = await prisma.team.create({
         data: { name: 'Personal Team', slug: `personal-${Date.now()}`, ownerId: userId }
       });
     }
-
-    // 3. Find or create a project
-    let project = await prisma.project.findFirst({ where: { repoUrl } });
+ 
+    // 2. Find or create a project belonging to this user
+    let project = await prisma.project.findFirst({ 
+      where: { repoUrl, userId } 
+    });
     
     // Always analyze for fresh settings (True Auto-Pilot)
     let analysis;
@@ -137,6 +125,7 @@ export const listDeployments = async (req: Request, res: Response, next: NextFun
     });
 
     const deployments = await prisma.deployment.findMany({
+      where: { userId: req.user!.id },
       orderBy: { createdAt: 'desc' },
       include: { 
         project: {
@@ -153,13 +142,16 @@ export const listDeployments = async (req: Request, res: Response, next: NextFun
 
 export const getDeployment = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const deployment = await prisma.deployment.findUnique({
-      where: { id: req.params.deploymentId },
+    const deployment = await prisma.deployment.findFirst({
+      where: { 
+        id: req.params.deploymentId,
+        userId: req.user!.id // Strict ownership check
+      },
       include: { project: true }
     });
     
     if (!deployment) {
-      return res.status(404).json({ success: false, message: 'Deployment not found' });
+      return res.status(404).json({ success: false, message: 'Deployment not found or access denied' });
     }
 
     res.json({ success: true, data: deployment });
@@ -170,6 +162,15 @@ export const getDeployment = async (req: Request, res: Response, next: NextFunct
 
 export const getLogs = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Verify deployment ownership before returning logs
+    const deployment = await prisma.deployment.findFirst({
+      where: { id: req.params.deploymentId, userId: req.user!.id }
+    });
+
+    if (!deployment) {
+      return res.status(404).json({ success: false, message: 'Deployment not found or access denied' });
+    }
+
     const logs = await prisma.buildLog.findMany({
       where: { deploymentId: req.params.deploymentId },
       orderBy: { timestamp: 'asc' }
@@ -194,16 +195,14 @@ export const rollbackDeployment = async (req: Request, res: Response, next: Next
   return promoteDeployment(req, res, next);
 };
 
-export const promoteDeployment = async (req: Request, res: Response, next: NextFunction) => {
-  try {
     const { deploymentId } = req.params;
     
-    const deployment = await prisma.deployment.findUnique({
-      where: { id: deploymentId },
+    const deployment = await prisma.deployment.findFirst({
+      where: { id: deploymentId, userId: req.user!.id },
       include: { project: true }
     });
-
-    if (!deployment) return res.status(404).json({ success: false, message: 'Deployment not found' });
+ 
+    if (!deployment) return res.status(404).json({ success: false, message: 'Deployment not found or access denied' });
     if (deployment.status !== 'READY') return res.status(400).json({ success: false, message: 'Only READY deployments can be promoted' });
 
     // Update project production pointer
@@ -237,9 +236,15 @@ export const getChecks = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
-export const getDeploymentStatus = async (req: Request, res: Response, next: NextFunction) => {
-  try {
     const { deploymentId } = req.params;
+    
+    // Verify ownership
+    const deployment = await prisma.deployment.findFirst({
+      where: { id: deploymentId, userId: req.user!.id }
+    });
+
+    if (!deployment) return res.status(404).json({ success: false, message: 'Deployment not found or access denied' });
+
     const isRunning = BuildService.isProcessRunning(deploymentId);
     const port = BuildService.getRunningPort(deploymentId);
     
@@ -259,17 +264,22 @@ export const getDeploymentStatus = async (req: Request, res: Response, next: Nex
 
 export const deleteDeployment = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { deploymentId } = req.params;
-    
-    // 1. Stop process if running
+    // 1. Verify ownership
+    const deployment = await prisma.deployment.findFirst({
+      where: { id: deploymentId, userId: req.user!.id }
+    });
+
+    if (!deployment) return res.status(404).json({ success: false, message: 'Deployment not found or access denied' });
+
+    // 2. Stop process if running
     try {
       await BuildService.stopProcess(deploymentId);
     } catch (e) {}
     
-    // 2. Delete logs first (foreign key constraint)
+    // 3. Delete logs first (foreign key constraint)
     await prisma.buildLog.deleteMany({ where: { deploymentId } });
     
-    // 3. Delete deployment
+    // 4. Delete deployment
     await prisma.deployment.delete({ where: { id: deploymentId } });
     
     res.json({ success: true, message: 'Deployment deleted successfully' });
