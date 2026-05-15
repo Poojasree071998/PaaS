@@ -59,7 +59,7 @@ export default function Home() {
           <div className="space-y-10 animate-in fade-in slide-in-from-left-8 duration-1000">
             <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
               <Activity className="w-4 h-4 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em]">v2.4.0 Now Live</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">v3.0.0-PRO Now Live</span>
             </div>
             
             <h1 className="text-7xl md:text-8xl font-black tracking-tighter leading-[0.9] text-white">
