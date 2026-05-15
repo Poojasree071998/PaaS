@@ -29,16 +29,20 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   
   try {
     const res = await fetch(url, fetchOptions);
-    const text = await res.text();
+    
+    // Auto-logout on 401 Unauthorized
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('df_token');
+      localStorage.removeItem('df_user');
+      window.location.href = '/login?error=session_expired';
+      return { success: false, message: 'Session expired' };
+    }
 
+    const text = await res.text();
     try {
-      const data = JSON.parse(text);
-      return data;
+      return JSON.parse(text);
     } catch (e) {
-      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-        throw new Error(`API returned HTML instead of JSON. URL: ${url}`);
-      }
-      throw new Error(`Invalid JSON from ${url}.`);
+      return { success: false, error: 'Invalid response from server' };
     }
   } catch (err: any) {
     if (typeof window === 'undefined') {

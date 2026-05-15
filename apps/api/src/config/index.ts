@@ -11,7 +11,7 @@ const envSchema = z.object({
   
   JWT_ACCESS_SECRET: z.string().default('dev-secret-access'),
   JWT_REFRESH_SECRET: z.string().default('dev-secret-refresh'),
-  JWT_EXPIRES_IN: z.string().default('15m'),
+  JWT_EXPIRES_IN: z.string().default('24h'),
   
   ENCRYPTION_MASTER_KEY: z.string().default('12345678901234567890123456789012'),
   
