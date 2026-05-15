@@ -258,49 +258,74 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3 space-y-8">
           {/* Main Status Display */}
+          {/* Main Status Display - Redesigned for Clarity */}
           <div className={cn(
-            "glass-card p-8 border-l-8 transition-all duration-700",
-            status === 'READY' ? "border-emerald-500 bg-emerald-500/5" : 
-            status === 'ERROR' ? "border-red-500 bg-red-500/5" : "border-amber-500 bg-amber-500/5"
+            "rounded-3xl border p-8 transition-all duration-700 shadow-2xl",
+            status === 'READY' ? "border-emerald-500/30 bg-emerald-500/5 shadow-emerald-500/5" : 
+            status === 'ERROR' ? "border-red-500/30 bg-red-500/5 shadow-red-500/5" : 
+            "border-blue-500/30 bg-blue-500/5 shadow-blue-500/5"
           )}>
-            <div className="flex items-start justify-between">
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg",
-                    status === 'READY' ? "bg-emerald-500" : status === 'ERROR' ? "bg-red-500" : "bg-amber-500"
-                  )}>
-                    {status === 'READY' ? <CheckCircle2 className="w-7 h-7 text-white" /> : 
-                     status === 'ERROR' ? <AlertCircle className="w-7 h-7 text-white" /> : 
-                     <Loader2 className="w-7 h-7 text-white animate-spin" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-2xl font-bold">{status}</h2>
-                      <span className="text-[10px] font-black bg-white/10 px-2 py-0.5 rounded-full text-zinc-400 uppercase tracking-tighter">Production</span>
-                    </div>
-                    <p className="text-zinc-400 font-medium">
-                      {status === 'READY' ? 'Your latest changes are now live globally.' : 
-                       status === 'ERROR' ? (deployment?.errorMessage || 'The build process encountered an error.') : 
-                       `Executing Step ${currentStep} of 4...`}
-                    </p>
-                  </div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-center gap-6">
+                <div className={cn(
+                  "w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl transition-all duration-500",
+                  status === 'READY' ? "bg-emerald-500 scale-110" : 
+                  status === 'ERROR' ? "bg-red-500" : 
+                  "bg-blue-500 animate-pulse"
+                )}>
+                  {status === 'READY' ? <CheckCircle2 className="w-8 h-8 text-white" /> : 
+                   status === 'ERROR' ? <AlertCircle className="w-8 h-8 text-white" /> : 
+                   <Loader2 className="w-8 h-8 text-white animate-spin" />}
                 </div>
-              </div>
-
-              <div className="hidden md:flex items-center gap-8 text-right">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Region</p>
-                  <p className="font-bold text-white">Global (Anycast)</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Engine</p>
-                  <p className="font-bold text-white flex items-center gap-2 justify-end">
-                    <Zap className="w-3.5 h-3.5 text-amber-500" /> Turbo-Build
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-3xl font-black tracking-tight text-white capitalize">
+                      {status === 'READY' ? 'Live' : status.toLowerCase() + '...'}
+                    </h2>
+                    <span className="text-[10px] font-black bg-white/10 px-2 py-0.5 rounded-full text-zinc-400 uppercase tracking-widest">Production</span>
+                  </div>
+                  <p className="text-zinc-400 font-medium text-lg">
+                    {status === 'READY' ? 'Success! Your project is deployed.' : 
+                     status === 'ERROR' ? 'Build failed. Check the logs below.' : 
+                     `Step ${currentStep} of 4: ${
+                        currentStep === 1 ? 'Fetching Source' : 
+                        currentStep === 2 ? 'Installing Dependencies' : 
+                        currentStep === 3 ? 'Building Project' : 'Going Live'
+                     }`}
                   </p>
                 </div>
               </div>
+
+              {status === 'READY' && deployment?.url && (
+                <a 
+                  href={deployment.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl transition-all flex items-center gap-3 shadow-xl shadow-emerald-500/20 active:scale-95 group"
+                >
+                  <ExternalLink className="w-5 h-5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  Visit Site
+                </a>
+              )}
             </div>
+
+            {/* Visual Progress Bar */}
+            {(status === 'BUILDING' || status === 'QUEUED') && (
+              <div className="mt-8 space-y-3">
+                <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                  <div 
+                    className="h-full bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out" 
+                    style={{ width: `${(currentStep / 4) * 100}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">
+                  <span className={cn(currentStep >= 1 && "text-blue-400")}>Fetch</span>
+                  <span className={cn(currentStep >= 2 && "text-blue-400")}>Install</span>
+                  <span className={cn(currentStep >= 3 && "text-blue-400")}>Build</span>
+                  <span className={cn(currentStep >= 4 && "text-blue-400")}>Deploy</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Terminal Logs */}
