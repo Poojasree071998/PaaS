@@ -10,6 +10,9 @@ import { getIO } from '../config/socket';
 import { Framework } from '@prisma/client';
 import { buildQueue } from '../queues';
 import { ManagedMongoService } from './managedMongoService';
+import axios from 'axios';
+import AdmZip from 'adm-zip';
+import os from 'os';
 
 const runningProcesses = new Map<string, any>(); // deploymentId -> { process, port }
 const buildingDeployments = new Set<string>(); // projectId
@@ -234,7 +237,12 @@ export class BuildService {
         await git.clone(deployment.project.repoUrl, buildDir, ['--depth', '1']);
         await this.log(deploymentId, `  ↳ Clone complete.`, LogLevel.INFO);
       } catch (e: any) {
-        throw new Error(`Failed to clone repository: ${e.message}`);
+        if (e.message.includes('ENOENT') || e.message.includes('git not found')) {
+          await this.log(deploymentId, `⚠️ System 'git' not found. Falling back to High-Speed API Download...`, LogLevel.WARN);
+          await this.downloadGithubRepo(deployment.project.repoUrl, buildDir, deploymentId);
+        } else {
+          throw new Error(`Failed to clone repository: ${e.message}`);
+        }
       }
 
       const port = await this.findAvailablePort();
@@ -491,6 +499,52 @@ export class BuildService {
       const log = await prisma.buildLog.create({ data: { deploymentId, message: content, level, timestamp: new Date() } });
       getIO().to(`deployment:${deploymentId}`).emit('deployment:log', { ...log, message: content });
     } catch (e) {}
+  }
+
+  private async downloadGithubRepo(repoUrl: string, targetDir: string, deploymentId: string) {
+    try {
+      // Convert github.com/user/repo to api.github.com/repos/user/repo/zipball
+      const parts = repoUrl.replace('https://github.com/', '').split('/');
+      const user = parts[0];
+      const repo = parts[1].replace('.git', '');
+      const zipUrl = `https://github.com/${user}/${repo}/archive/refs/heads/main.zip`;
+      
+      await this.log(deploymentId, `  ↳ Downloading source from ${zipUrl}...`, LogLevel.INFO);
+      
+      const response = await axios({
+        method: 'get',
+        url: zipUrl,
+        responseType: 'arraybuffer'
+      });
+
+      const zip = new AdmZip(Buffer.from(response.data));
+      const zipEntries = zip.getEntries();
+      
+      // The first entry is usually the root folder name in the zip
+      const rootFolderName = zipEntries[0].entryName.split('/')[0];
+      
+      await this.log(deploymentId, `  ↳ Extracting files...`, LogLevel.INFO);
+      zip.extractAllTo(targetDir, true);
+
+      // Move files up if they are nested in a subfolder (which GitHub Zips are)
+      const extractedPath = path.join(targetDir, rootFolderName);
+      if (fs.existsSync(extractedPath)) {
+        const files = fs.readdirSync(extractedPath);
+        for (const file of files) {
+          const oldPath = path.join(extractedPath, file);
+          const newPath = path.join(targetDir, file);
+          if (fs.existsSync(newPath)) {
+            await fsPromises.rm(newPath, { recursive: true, force: true });
+          }
+          await fsPromises.rename(oldPath, newPath);
+        }
+        await fsPromises.rm(extractedPath, { recursive: true, force: true });
+      }
+
+      await this.log(deploymentId, `✅ Source downloaded and extracted successfully via API fallback.`, LogLevel.INFO);
+    } catch (e: any) {
+      throw new Error(`Fallback download failed: ${e.message}. Ensure the repository is public and branch 'main' exists.`);
+    }
   }
 
   private static translateError(error: string): string {
