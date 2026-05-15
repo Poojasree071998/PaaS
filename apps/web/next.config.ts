@@ -11,11 +11,11 @@ const nextConfig = {
     return [
       {
         source: '/health',
-        destination: 'https://paas-k7nx.onrender.com/health',
+        destination: 'http://localhost:4000/health',
       },
       {
         source: '/api/:path*',
-        destination: 'https://paas-k7nx.onrender.com/api/:path*',
+        destination: 'http://localhost:4000/api/:path*',
       },
     ];
   },
