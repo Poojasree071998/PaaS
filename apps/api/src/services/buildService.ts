@@ -202,6 +202,8 @@ export class BuildService {
     buildingDeployments.add(deployment.projectId);
     
     try {
+      await this.log(deploymentId, `🔍 System Check: Platform=${process.platform}, CWD=${process.cwd()}, User=${process.env.USER || 'unknown'}`, LogLevel.INFO);
+      
       if (process.platform === 'win32') await new Promise(resolve => setTimeout(resolve, 2000));
 
       await prisma.deployment.update({ where: { id: deploymentId }, data: { status: DeploymentStatus.BUILDING } });
@@ -469,7 +471,7 @@ export class BuildService {
 
   private static translateError(error: string): string {
     if (error.includes('128') || error.includes('not found')) return 'Repository not found. Ensure it is public.';
-    if (error.includes('ENOENT')) return 'A required file or directory was not found. Check your root directory setting and ensure the repository is accessible.';
+    // Removed generic ENOENT translation to show real paths in logs
     return error;
   }
 
