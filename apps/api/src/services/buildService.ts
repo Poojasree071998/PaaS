@@ -149,10 +149,12 @@ export class BuildService {
 
     if (!deployment) return;
 
-    // Use /tmp for builds on Render if possible, or ensure path is absolute and sanitized
+    // Use a professional, isolated build path
     const isRender = process.env.RENDER === 'true';
-    const rootBuildDir = isRender ? '/tmp/deployflow-builds' : path.resolve(process.cwd(), 'temp-builds');
+    const baseTempDir = isRender ? '/tmp' : path.join(process.cwd(), 'temp-builds');
+    const rootBuildDir = path.join(baseTempDir, 'deployflow-work');
     const buildDir = path.join(rootBuildDir, deployment.projectId);
+    
     const isRecovery = deployment.status === DeploymentStatus.READY;
     
     if (isRecovery && fs.existsSync(buildDir)) {
@@ -166,7 +168,14 @@ export class BuildService {
       }
     }
 
+    // ENSURE CLEAN START: Real platforms always start from a clean state
     await this.cleanupStaleProcesses(deployment.projectId);
+    if (fs.existsSync(buildDir)) {
+      try {
+        await fsPromises.rm(buildDir, { recursive: true, force: true });
+        await this.log(deploymentId, `🧹 Cleaned up previous build artifacts.`, LogLevel.INFO);
+      } catch (e) {}
+    }
 
     if (buildingDeployments.has(deployment.projectId)) {
       await this.log(deploymentId, `⏳ A build is already active for this project. This usually happens during auto-recovery. We will wait for it to finish...`, LogLevel.WARN);
@@ -202,31 +211,28 @@ export class BuildService {
         if (!fs.existsSync(rootBuildDir)) {
           await fsPromises.mkdir(rootBuildDir, { recursive: true });
         }
-        if (!fs.existsSync(buildDir)) {
-          await fsPromises.mkdir(buildDir, { recursive: true });
-        }
+        await fsPromises.mkdir(buildDir, { recursive: true });
       } catch (e: any) {
-        throw new Error(`Failed to create build directory: ${e.message}`);
+        throw new Error(`Failed to create build workspace: ${e.message}`);
       }
 
-      if (!deployment.project.repoUrl) throw new Error('Repository URL is empty.');
+      if (!deployment.project.repoUrl) throw new Error('No GitHub repository URL provided.');
 
       const git = simpleGit();
       
-      // Verify git installation
+      // Verify environment
       try {
         await git.version();
       } catch (e) {
-        throw new Error('Git command not found in environment.');
+        throw new Error('System environment error: Git not found. Please contact support.');
       }
 
-      if (!fs.existsSync(path.join(buildDir, '.git'))) {
-        await this.log(deploymentId, `  ↳ Cloning repository...`, LogLevel.INFO);
-        await git.clone(deployment.project.repoUrl, buildDir);
+      await this.log(deploymentId, `  ↳ Cloning repository from GitHub...`, LogLevel.INFO);
+      try {
+        await git.clone(deployment.project.repoUrl, buildDir, ['--depth', '1']);
         await this.log(deploymentId, `  ↳ Clone complete.`, LogLevel.INFO);
-      } else {
-        await this.log(deploymentId, `  ↳ Pulling latest changes...`, LogLevel.INFO);
-        await git.cwd(buildDir).reset(['--hard']).pull();
+      } catch (e: any) {
+        throw new Error(`Failed to clone repository: ${e.message}`);
       }
 
       const port = await this.findAvailablePort();
