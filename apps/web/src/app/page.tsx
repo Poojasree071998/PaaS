@@ -13,8 +13,18 @@ import {
   Cloud
 } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [nodeName, setNodeName] = useState('Cloud Node');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const name = localStorage.getItem('df_api_url')?.includes('render') ? 'Cloud Node' : 'Local Node';
+      setNodeName(name);
+    }
+  }, []);
+
   return (
     <main className="min-h-screen bg-black text-white selection:bg-blue-500/30 selection:text-blue-200 overflow-x-hidden">
       {/* Dynamic Background */}
@@ -168,12 +178,7 @@ export default function Home() {
 
           <div className="flex items-center gap-6">
             <button className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors">
-              <Globe className="w-4 h-4" /> {(() => {
-                if (typeof window !== 'undefined') {
-                  return localStorage.getItem('df_api_url')?.includes('render') ? 'Cloud Node' : 'Local Node';
-                }
-                return 'Cloud Node';
-              })()}
+              <Globe className="w-4 h-4" /> {nodeName}
             </button>
             <div className="flex items-center gap-2 text-emerald-500 font-bold uppercase text-[10px] tracking-widest">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

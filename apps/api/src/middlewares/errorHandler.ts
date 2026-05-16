@@ -13,11 +13,11 @@ export const errorHandler: ErrorRequestHandler = (
   let message = 'An unexpected error occurred';
   let details: any[] = [];
 
-  if (err instanceof AppError) {
-    statusCode = err.statusCode;
-    code = err.code;
-    message = err.message;
-    details = err.details;
+  if (err instanceof AppError || err.name === 'UnauthorizedError') {
+    statusCode = err.statusCode || 401;
+    code = err.code || 'UNAUTHORIZED';
+    message = err.message || 'Unauthorized';
+    details = err.details || [];
   } else if (err.name === 'ZodError') {
     statusCode = 422;
     code = 'VALIDATION_ERROR';

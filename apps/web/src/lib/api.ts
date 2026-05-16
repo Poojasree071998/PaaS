@@ -42,7 +42,22 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 
     const text = await res.text();
     try {
-      return JSON.parse(text);
+      const parsedData = JSON.parse(text);
+      
+      // Fallback auth check in case the backend returns 500 or 200 but the payload is actually an auth error
+      if (
+        parsedData?.error?.code === 'UNAUTHORIZED' || 
+        parsedData?.error?.message === 'Invalid or expired token'
+      ) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('df_token');
+          localStorage.removeItem('df_user');
+          window.location.href = '/login?error=session_expired';
+        }
+        return { success: false, message: 'Session expired' };
+      }
+      
+      return parsedData;
     } catch (e) {
       return { success: false, error: 'Invalid response from server' };
     }
