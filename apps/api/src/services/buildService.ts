@@ -31,7 +31,10 @@ export class BuildService {
 
     // 2. Windows Deep Cleanup: Kill any process locking the build directory
     if (process.platform === 'win32') {
-      const buildDir = path.resolve(process.cwd(), 'temp-builds', projectId);
+      const isRender = process.env.RENDER === 'true';
+      const baseTempDir = isRender ? '/tmp' : path.join(process.cwd(), 'temp-builds');
+      const buildDir = path.join(baseTempDir, 'deployflow-work', projectId);
+      
       const psCmd = `powershell -Command "Get-Process | Where-Object { $_.Path -like '${buildDir.replace(/\\/g, '\\')}*' } | Stop-Process -Force"`;
       try { spawn(psCmd, [], { shell: true }); } catch (e) {}
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -219,6 +222,9 @@ export class BuildService {
     const cacheDir = path.join(baseTempDir, `${deployment.projectId}-cache`);
 
     // --- INTELLIGENT CACHE RECOVERY ---
+    // Ensure all processes for this project are stopped before we touch files
+    await this.cleanupStaleProcesses(deployment.projectId);
+
     // Instead of nuking everything, we salvage node_modules to speed up builds
     if (fs.existsSync(buildDir)) {
       try {
