@@ -174,13 +174,18 @@ export class ProxyService {
         path.join(projectPath, '.next', 'static'),
         path.join(projectPath, 'build', 'static'),
         path.join(projectPath, 'client', 'dist'),
+        path.join(projectPath, 'client', 'build'),
         path.join(projectPath, 'frontend', 'dist'),
+        path.join(projectPath, 'frontend', 'build'),
         path.join(projectPath, 'apps', 'web', 'dist'),
+        path.join(projectPath, 'apps', 'web', 'build'),
         path.join(projectPath, 'web', 'dist'),
+        path.join(projectPath, 'web', 'build'),
         // Sub-assets folders
         path.join(projectPath, 'dist', 'assets'),
         path.join(projectPath, 'build', 'assets'),
         path.join(projectPath, 'frontend', 'dist', 'assets'),
+        path.join(projectPath, 'frontend', 'build', 'assets'),
         projectPath,
       ];
 
