@@ -170,9 +170,13 @@ export class ProxyService {
         projectPath = path.join(buildRoot, cleanRoot);
       }
 
-      // 3. Define Search Folders (Expanded for deep assets)
       // 3. Define Search Folders (Expanded for deep assets and monorepo root)
+      const meta = deployment.meta as any;
       const searchFolders = [
+        // A. Priority: Exact folder found during build health check
+        ...(meta?.staticFolder ? [path.join(buildRoot, meta.staticFolder)] : []),
+        
+        // B. Heuristic searches
         path.join(projectPath, 'dist'),
         path.join(projectPath, 'build'),
         path.join(projectPath, 'public'),
