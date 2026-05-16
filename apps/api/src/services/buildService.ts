@@ -322,6 +322,10 @@ export class BuildService {
       };
       syncPath(workingDir);
 
+      // --- LOW MEMORY OPTIMIZATION ---
+      // Render free tier has 512MB RAM. Vite/tsc builds frequently crash or freeze.
+      env.NODE_OPTIONS = '--max-old-space-size=400';
+
       // Install
       const isStaticNoPackage = deployment.project.framework === Framework.STATIC && !fs.existsSync(pkgPath);
 
@@ -390,9 +394,16 @@ export class BuildService {
       env.VITE_BASE_PATH = livePath; 
       
       const rootPkgPath = path.join(workingDir, 'package.json');
-      const rootPkg = fs.existsSync(rootPkgPath) ? JSON.parse(fs.readFileSync(rootPkgPath, 'utf8')) : {};
+      let rootPkg = fs.existsSync(rootPkgPath) ? JSON.parse(fs.readFileSync(rootPkgPath, 'utf8')) : {};
+      
+      // Strip 'tsc' to prevent OOM errors on free tier
+      if (rootPkg.scripts?.build && rootPkg.scripts.build.includes('tsc')) {
+        rootPkg.scripts.build = rootPkg.scripts.build.replace(/tsc\s*&&\s*/g, '').replace(/vue-tsc\s*&&\s*/g, '');
+        fs.writeFileSync(rootPkgPath, JSON.stringify(rootPkg, null, 2));
+      }
+
       if (!isStaticNoPackage && (rootPkg.scripts?.build || deployment.project.buildCommand)) {
-        await this.log(deploymentId, `[3/4] 🔨 Building project...`, LogLevel.INFO);
+        await this.log(deploymentId, `[3/4] 🔨 Building project (Optimized for Low-Memory)...`, LogLevel.INFO);
         let bCmd = deployment.project.buildCommand || 'npm run build';
         
         // --- DYNAMIC BASE PATH INJECTION ---
@@ -423,8 +434,16 @@ export class BuildService {
 
         for (const folder of subfolders) {
           const folderPath = path.join(workingDir, folder);
-          const pkg = JSON.parse(fs.readFileSync(path.join(folderPath, 'package.json'), 'utf8'));
+          const pkgPath = path.join(folderPath, 'package.json');
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          
           if (pkg.scripts?.build) {
+            // Strip 'tsc' for subfolders too
+            if (pkg.scripts.build.includes('tsc')) {
+              pkg.scripts.build = pkg.scripts.build.replace(/tsc\s*&&\s*/g, '').replace(/vue-tsc\s*&&\s*/g, '');
+              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+            }
+
             await this.log(deploymentId, `🔨 Building detected sub-project: '${folder}'...`, LogLevel.INFO);
             try {
               await this.executeLiveCommand(deploymentId, 'npm run build', [], folderPath, env, 600000);
