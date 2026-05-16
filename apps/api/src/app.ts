@@ -148,8 +148,15 @@ app.use(async (req, res, next) => {
   }
   const baseDomain = process.env.APP_SUBDOMAIN_BASE || 'deployflow.dev';
 
-  // 0. Skip for API routes and Localhost
-  if (req.path.startsWith('/api') || host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+  // 0. Skip for API routes, live previews, platform domains, and Localhost
+  if (
+    req.path.startsWith('/api') || 
+    req.path.startsWith('/live') || 
+    host.startsWith('localhost') || 
+    host.startsWith('127.0.0.1') ||
+    host.includes('onrender.com') ||
+    host.includes('vercel.app')
+  ) {
     return next();
   }
 
