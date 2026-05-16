@@ -16,7 +16,7 @@ import {
   Trash2,
   X
 } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, invalidateCache } from '@/lib/api';
 
 interface ManagedDatabase {
   id: string;
@@ -69,6 +69,8 @@ export default function DatabasesPage() {
         }),
       });
       if (data.success) {
+        // Bust cache so the list reflects the new DB
+        invalidateCache('/api/databases');
         // Force refresh the list
         await fetchDatabases();
         setShowCreate(false);

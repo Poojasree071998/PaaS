@@ -139,12 +139,15 @@ export class ProxyService {
       }
 
       // --- SMART PROCESS RE-LINKING ---
+      // Only auto-wake on root/index page requests, NOT on asset/api requests
+      // This prevents re-triggering builds when users just click "View Logs"
       let targetPort = BuildService.getRunningPort(id);
-      if (!targetPort && deployment.status === 'READY' && !BuildService.isBuilding(projectId)) {
+      const isRootRequest = !cleanPath || cleanPath === '' || cleanPath === 'index.html';
+      if (!targetPort && deployment.status === 'READY' && !BuildService.isBuilding(projectId) && isRootRequest) {
         logger.info(`Auto-waking deployment ${id}`);
         BuildService.runBuild(id).catch(() => {});
         
-        return res.status(502).send(`
+        return res.status(202).send(`
           <div style="font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; background: #09090b; color: white;">
             <div style="text-align: center; max-width: 500px; padding: 20px;">
               <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; margin: 0 auto 20px; animation: spin 1s linear infinite;"></div>

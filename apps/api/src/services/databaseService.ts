@@ -41,11 +41,17 @@ export class DatabaseService {
       }
     }
 
-    // Double check access
-    const member = await prisma.teamMember.findFirst({
-      where: { teamId, userId, inviteAccepted: true }
-    });
-    if (!member) throw new ForbiddenError('You do not have access to this team');
+    // Determine if teamId was explicitly provided by the caller
+    const isExplicitTeam = data.teamId && data.teamId !== 'default' && data.teamId !== 'null' && data.teamId !== '';
+
+    if (isExplicitTeam) {
+      // Only enforce membership check for explicitly specified teams
+      const member = await prisma.teamMember.findFirst({
+        where: { teamId, userId, inviteAccepted: true }
+      });
+      if (!member) throw new ForbiddenError('You do not have access to this team');
+    }
+    // If teamId was auto-resolved (personal team), skip the check — user is always the owner
 
     // Simulate provisioning
     const dbId = uuidv4().slice(0, 8);
