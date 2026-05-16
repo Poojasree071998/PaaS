@@ -60,12 +60,26 @@ export class BuildService {
     const isLocal = process.env.RENDER !== 'true' && (process.env.NODE_ENV !== 'production' || process.platform === 'win32');
     if (isLocal && !env.MONGODB_URI && !env.MONGO_URI) {
        // Check for mongodb/mongoose in package.json
-       const pkgPath = path.join(process.cwd(), 'temp-builds', 'deployflow-work', deployment.projectId, 'package.json');
+       // Check for mongodb/mongoose in package.json (root and subfolders)
+       const projectRoot = path.join(process.cwd(), 'temp-builds', 'deployflow-work', deployment.projectId);
+       const searchPaths = [
+         path.join(projectRoot, 'package.json'),
+         path.join(projectRoot, 'backend', 'package.json'),
+         path.join(projectRoot, 'api', 'package.json'),
+         path.join(projectRoot, 'server', 'package.json'),
+         path.join(projectRoot, 'server', 'package.json')
+       ];
+
        let needsMongo = false;
-       if (fs.existsSync(pkgPath)) {
-         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-         const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-         if (deps.mongodb || deps.mongoose || deps['@prisma/client']) needsMongo = true;
+       for (const pkgPath of searchPaths) {
+         if (fs.existsSync(pkgPath)) {
+           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+           const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+           if (deps.mongodb || deps.mongoose || deps['@prisma/client'] || (pkg.scripts?.start && pkg.scripts.start.includes('mongo'))) {
+             needsMongo = true;
+             break;
+           }
+         }
        }
        
        if (needsMongo) {
@@ -109,6 +123,7 @@ export class BuildService {
     }
 
     let finalStartCommand = startCommand;
+    let detectedSubfolder = '';
     const subfolders = ['backend', 'api', 'server', 'web'];
     for (const f of subfolders) {
       const sP = path.join(workingDir, f);
@@ -117,6 +132,7 @@ export class BuildService {
         if (pkg.scripts?.start || pkg.scripts?.dev) {
           const subCmd = pkg.scripts?.start ? 'start' : 'run dev';
           finalStartCommand = `npm ${subCmd} --prefix ${f}`;
+          detectedSubfolder = f;
           await this.log(deploymentId, `🚀 Monorepo: Starting '${f}' via root prefix.`, LogLevel.INFO);
           break;
         }
@@ -137,6 +153,11 @@ export class BuildService {
       // --- NUCLEAR ENV INJECTION: Override project's local .env ---
       const envLines = Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n');
       fs.writeFileSync(path.join(workingDir, '.env'), envLines);
+      
+      // Also write to subfolder for monorepos (so dotenv can find it)
+      if (detectedSubfolder) {
+        fs.writeFileSync(path.join(workingDir, detectedSubfolder, '.env'), envLines);
+      }
 
       await this.log(deploymentId, `[4/4] 🚀 Starting backend process...`, LogLevel.INFO);
       await this.executeBackendProcess(deploymentId, deployment, workingDir, env, finalStartCommand, port);
