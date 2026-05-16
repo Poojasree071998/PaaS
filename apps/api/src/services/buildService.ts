@@ -171,9 +171,37 @@ export class BuildService {
       }
     }
 
+    const cacheDir = path.join(baseTempDir, `${deployment.projectId}-cache`);
+
     // ENSURE CLEAN START: Real platforms always start from a clean state
     await this.cleanupStaleProcesses(deployment.projectId);
     if (fs.existsSync(buildDir)) {
+      try {
+        if (!fs.existsSync(cacheDir)) {
+          await fsPromises.mkdir(cacheDir, { recursive: true });
+        }
+        
+        // Salvage root node_modules
+        const rootNodeModules = path.join(buildDir, 'node_modules');
+        if (fs.existsSync(rootNodeModules)) {
+          await fsPromises.rename(rootNodeModules, path.join(cacheDir, 'node_modules'));
+        }
+        
+        // Salvage subfolder node_modules
+        const cacheSubfolders = ['backend', 'frontend', 'api', 'web', 'client', 'server'];
+        for (const folder of cacheSubfolders) {
+          const subNodeModules = path.join(buildDir, folder, 'node_modules');
+          if (fs.existsSync(subNodeModules)) {
+            if (!fs.existsSync(path.join(cacheDir, folder))) {
+               await fsPromises.mkdir(path.join(cacheDir, folder), { recursive: true });
+            }
+            await fsPromises.rename(subNodeModules, path.join(cacheDir, folder, 'node_modules'));
+          }
+        }
+      } catch (e) {
+        logger.warn(`Failed to salvage node_modules cache for ${deployment.projectId}:`, e);
+      }
+
       try {
         await fsPromises.rm(buildDir, { recursive: true, force: true });
         await this.log(deploymentId, `🧹 Cleaned up previous build artifacts.`, LogLevel.INFO);
@@ -245,6 +273,30 @@ export class BuildService {
         }
       }
 
+      // Restore cache
+      if (fs.existsSync(cacheDir)) {
+        try {
+          await this.log(deploymentId, `⚡ Restoring node_modules cache to speed up build...`, LogLevel.INFO);
+          const cachedRootModules = path.join(cacheDir, 'node_modules');
+          if (fs.existsSync(cachedRootModules)) {
+            await fsPromises.rename(cachedRootModules, path.join(buildDir, 'node_modules'));
+          }
+          const cacheSubfolders = ['backend', 'frontend', 'api', 'web', 'client', 'server'];
+          for (const folder of cacheSubfolders) {
+            const cachedSubModules = path.join(cacheDir, folder, 'node_modules');
+            if (fs.existsSync(cachedSubModules)) {
+               if (!fs.existsSync(path.join(buildDir, folder))) {
+                 await fsPromises.mkdir(path.join(buildDir, folder), { recursive: true });
+               }
+               await fsPromises.rename(cachedSubModules, path.join(buildDir, folder, 'node_modules'));
+            }
+          }
+          await fsPromises.rm(cacheDir, { recursive: true, force: true }); // cleanup cache dir after restore
+        } catch (e) {
+          logger.warn(`Failed to restore node_modules cache for ${deployment.projectId}:`, e);
+        }
+      }
+
       const port = await this.findAvailablePort();
       const env = await this.generateEnv(deployment, port);
       env.NODE_ENV = 'development';
@@ -278,8 +330,8 @@ export class BuildService {
       } else if (fs.existsSync(pkgPath)) {
         await this.log(deploymentId, `[2/4] 📦 Synchronizing dependencies...`, LogLevel.INFO);
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        const isMonorepo = !!pkg.workspaces;
-        const installCmd = (isMonorepo || !fs.existsSync(path.join(workingDir, 'package-lock.json'))) ? 'install' : 'ci';
+        // Always use 'install' to preserve cached node_modules
+        const installCmd = 'install';
         let installSuccess = false;
         try {
           await this.executeLiveCommand(deploymentId, `npm install`, [installCmd, '--prefer-offline', '--no-audit', '--no-fund'], workingDir, env, 1200000);
@@ -314,7 +366,7 @@ export class BuildService {
           try {
             // Final verification before running npm
             if (fs.existsSync(subPkgPath)) {
-              await this.executeLiveCommand(deploymentId, `npm install (subfolder: ${folder})`, ['install', '--prefer-offline', '--no-audit', '--no-fund', '--no-package-lock'], subPath, env, 600000);
+              await this.executeLiveCommand(deploymentId, `npm install (subfolder: ${folder})`, ['install', '--prefer-offline', '--no-audit', '--no-fund'], subPath, env, 600000);
               
               const subPkg = JSON.parse(fs.readFileSync(subPkgPath, 'utf8'));
               if (subPkg.scripts?.build && !isActuallyStatic) {
