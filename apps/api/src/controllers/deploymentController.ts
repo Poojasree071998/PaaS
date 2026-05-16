@@ -45,6 +45,7 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
         databaseRequired: 'NONE',
         buildCommand: 'npm run build',
         rootDirectory: './',
+        outputDirectory: './dist',
         requiredEnvVars: [],
         detectedEnv: {}
       };
@@ -68,6 +69,7 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
           buildCommand: buildCommand || analysis.buildCommand || 'npm run build',
           repoBranch: branch || 'main',
           rootDirectory: rootDirectory || analysis.rootDirectory || './',
+          outputDirectory: analysis.outputDirectory || './dist',
           envVars: {
             create: processedEnvVars
           }
@@ -99,6 +101,7 @@ export const triggerDeploy = async (req: Request, res: Response, next: NextFunct
           buildCommand: buildCommand || project.buildCommand || analysis.buildCommand,
           repoBranch: branch || project.repoBranch,
           rootDirectory: rootDirectory || project.rootDirectory || analysis.rootDirectory,
+          outputDirectory: analysis.outputDirectory || project.outputDirectory,
           framework: (analysis.framework as Framework) || project.framework,
           envVars: {
             deleteMany: {}, // Clear old ones for simplicity in this demo

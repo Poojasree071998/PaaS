@@ -11,6 +11,7 @@ export interface AnalysisResult {
   buildCommand: string;
   startCommand: string;
   rootDirectory: string;
+  outputDirectory?: string;
   requiredEnvVars: string[];
   detectedEnv: Record<string, string>; // Added to store key-value pairs from .env
   databaseRequired: 'MONGODB' | 'POSTGRES' | 'REDIS' | 'NONE';
@@ -62,6 +63,24 @@ export class AnalysisService {
         const bestCandidate = pkgFiles.find(f => f.toString().includes('frontend') || f.toString().includes('web') || f.toString().includes('app')) || pkgFiles[0];
         primaryPkgPath = path.join(tempDir, bestCandidate.toString());
         result.rootDirectory = './' + path.dirname(bestCandidate.toString()).replace(/\\/g, '/');
+      }
+
+      // 1.5 Scan for vercel.json configuration
+      const vercelPath = path.join(tempDir, 'vercel.json');
+      if (fs.existsSync(vercelPath)) {
+        try {
+          const vercelConfig = JSON.parse(await fsPromises.readFile(vercelPath, 'utf8'));
+          if (vercelConfig.buildCommand) {
+             result.buildCommand = vercelConfig.buildCommand;
+             console.log(`[Analysis] Found buildCommand in vercel.json: ${result.buildCommand}`);
+          }
+          if (vercelConfig.outputDirectory) {
+             result.outputDirectory = vercelConfig.outputDirectory;
+             console.log(`[Analysis] Found outputDirectory in vercel.json: ${result.outputDirectory}`);
+          }
+        } catch (e) {
+          console.warn('[Analysis] Failed to parse vercel.json');
+        }
       }
 
       // 2. Scan primary package.json

@@ -376,10 +376,18 @@ export class BuildService {
         fs.writeFileSync(rootPkgPath, JSON.stringify(rootPkg, null, 2));
       }
 
-      if (!isStaticNoPackage && (rootPkg.scripts?.build || deployment.project.buildCommand)) {
+      // --- VERCEL.JSON DETECTION ---
+      const vercelConfig = await this.parseVercelConfig(workingDir);
+
+      if (!isStaticNoPackage && (rootPkg.scripts?.build || deployment.project.buildCommand || vercelConfig?.buildCommand)) {
         await this.log(deploymentId, `[3/4] 🔨 Building project (Optimized for Low-Memory)...`, LogLevel.INFO);
         let bCmd = deployment.project.buildCommand || 'npm run build';
         
+        if (vercelConfig?.buildCommand) {
+          bCmd = vercelConfig.buildCommand;
+          await this.log(deploymentId, `  ↳ Using build command from vercel.json: ${bCmd}`, LogLevel.INFO);
+        }
+
         // --- DYNAMIC BASE PATH INJECTION ---
         // Ensures that assets are requested with the correct /live/:id/ prefix
         const basePath = `/live/${deploymentId}/`;
@@ -439,11 +447,16 @@ export class BuildService {
       // --- FINAL HARDENING: Post-Build Health Guard with Grace Period ---
       await new Promise(resolve => setTimeout(resolve, 5000));
       
-      const assetFolders = ['dist', 'build', 'out', 'output', 'public', 'frontend/dist', 'frontend/build', 'web/dist', 'web/build'];
+      const assetFolders = [
+        deployment.project.outputDirectory,
+        vercelConfig?.outputDirectory,
+        'dist', 'build', 'out', 'output', 'public', 'frontend/dist', 'frontend/build', 'web/dist', 'web/build'
+      ].filter(Boolean) as string[];
+
       let foundFolder = '';
       
       for (const folder of assetFolders) {
-        const p = path.join(workingDir, folder);
+        const p = path.isAbsolute(folder) ? folder : path.join(workingDir, folder);
         if (fs.existsSync(p)) {
           const files = fs.readdirSync(p);
           if (files.length > 0) {
@@ -617,6 +630,19 @@ export class BuildService {
     } catch (e: any) {
       throw new Error(`Fallback download failed: ${e.message}. Ensure the repository is public and branch 'main' exists.`);
     }
+  }
+
+  private static async parseVercelConfig(dir: string): Promise<any> {
+    const vercelPath = path.join(dir, 'vercel.json');
+    if (fs.existsSync(vercelPath)) {
+      try {
+        return JSON.parse(fs.readFileSync(vercelPath, 'utf8'));
+      } catch (e) {
+        logger.warn(`Failed to parse vercel.json in ${dir}`);
+        return null;
+      }
+    }
+    return null;
   }
 
   private static translateError(error: string): string {
