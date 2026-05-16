@@ -16,9 +16,15 @@ export const initSocket = (server: HttpServer) => {
           "http://localhost:5173"
         ];
         
-        // Match specific origin or allowed patterns
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) {
-          callback(null, origin || true);
+        const isAllowed = !origin || 
+                         allowedOrigins.includes(origin) || 
+                         origin.endsWith('.vercel.app') || 
+                         origin.endsWith('.onrender.com');
+
+        if (isAllowed) {
+          // IMPORTANT: If credentials is true, origin cannot be '*'
+          // We must return the exact origin or the first allowed one
+          callback(null, origin || allowedOrigins[0]);
         } else {
           callback(new Error('Not allowed by CORS'));
         }
