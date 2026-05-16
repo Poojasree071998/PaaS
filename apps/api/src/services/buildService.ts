@@ -231,7 +231,7 @@ export class BuildService {
             await fsPromises.rename(target, cache);
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         logger.warn(`Cache salvage failed: ${e.message}`);
       }
       
@@ -274,7 +274,7 @@ export class BuildService {
             await this.log(deploymentId, `📦 Reused node_modules cache for /${folder}`, LogLevel.INFO);
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         logger.warn(`Cache restoration failed: ${e.message}`);
       }
       
