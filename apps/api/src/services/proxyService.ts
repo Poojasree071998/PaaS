@@ -143,8 +143,10 @@ export class ProxyService {
       // This prevents re-triggering builds when users just click "View Logs"
       let targetPort = BuildService.getRunningPort(id);
       const isRootRequest = !cleanPath || cleanPath === '' || cleanPath === 'index.html';
-      if (!targetPort && deployment.status === 'READY' && !BuildService.isBuilding(projectId) && isRootRequest) {
-        logger.info(`Auto-waking deployment ${id}`);
+      // If the process is dead but marked READY, wake it up. 
+      // We allow non-root requests to wake it up now if it's definitely not building.
+      if (!targetPort && deployment.status === 'READY' && !BuildService.isBuilding(projectId)) {
+        logger.info(`Auto-waking deployment ${id} due to inactive process`);
         BuildService.runBuild(id).catch(() => {});
         
         return res.status(202).send(`

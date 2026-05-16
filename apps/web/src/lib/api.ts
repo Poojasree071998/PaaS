@@ -86,6 +86,9 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
       // Cache successful GET responses
       if (isGetRequest && parsedData.success && typeof window !== 'undefined') {
         apiCache.set(cacheKey, { data: parsedData, expiresAt: Date.now() + CACHE_TTL_MS });
+      } else if (!isGetRequest && parsedData.success && typeof window !== 'undefined') {
+        // Clear cache on mutations to avoid stale data in lists
+        invalidateCache();
       }
       
       return parsedData;
