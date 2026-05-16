@@ -73,8 +73,8 @@ export default function DatabasesPage() {
         await fetchDatabases();
         setShowCreate(false);
         setNewName('');
-      } else {
-        alert('Creation failed: ' + (data.message || data.error || 'Internal Server Error'));
+        const errorMsg = data.message || (typeof data.error === 'object' ? (data.error.message || JSON.stringify(data.error)) : data.error) || 'Internal Server Error';
+        alert('Creation failed: ' + errorMsg);
       }
     } catch (error: any) {
       alert('Failed to create database: ' + (error.message || 'Check if the API is running.'));
