@@ -100,7 +100,10 @@ export class DatabaseService {
   }
 
   static async listDatabases(teamId: string, userId: string) {
-    if (teamId && teamId !== 'null' && teamId !== '') {
+    // Check if teamId is a valid cuid/uuid or if it's 'default'
+    const isValidTeamId = teamId && teamId.length > 5 && !['default', 'null', 'undefined', ''].includes(teamId);
+
+    if (isValidTeamId) {
       const member = await prisma.teamMember.findFirst({
         where: { teamId, userId, inviteAccepted: true }
       });
