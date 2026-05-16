@@ -286,7 +286,11 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                   </div>
                   <p className="text-zinc-400 font-medium text-lg">
                     {status === 'READY' ? 'Success! Your project is deployed.' : 
-                     status === 'ERROR' ? 'Build failed. Check the logs below.' : 
+                     status === 'ERROR' ? `Failed at Step ${currentStep}: ${
+                        currentStep === 1 ? 'Fetching Source' : 
+                        currentStep === 2 ? 'Installing Dependencies' : 
+                        currentStep === 3 ? 'Building Project' : 'Going Live'
+                     }` : 
                      `Step ${currentStep} of 4: ${
                         currentStep === 1 ? 'Fetching Source' : 
                         currentStep === 2 ? 'Installing Dependencies' : 
@@ -308,6 +312,78 @@ export default function DeploymentPage({ params }: { params: Promise<{ id: strin
                 </a>
               )}
             </div>
+
+            {/* Error Details & Auto-Retry UI */}
+            {status === 'ERROR' && (
+              <div className="mt-8 border-t border-red-500/20 pt-6 animate-in slide-in-from-bottom-4 duration-500">
+                <h3 className="text-red-400 font-bold mb-3 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" /> Error Details
+                </h3>
+                <p className="text-red-200/80 mb-6 bg-red-500/5 p-4 rounded-xl border border-red-500/10 font-mono text-sm">
+                  {deployment?.errorMessage || 'An unknown system error occurred during the build process.'}
+                </p>
+                
+                <div className="bg-black/30 rounded-xl p-5 border border-white/5">
+                  <p className="font-bold text-zinc-300 mb-3 uppercase tracking-wider text-xs">Recommended Fixes</p>
+                  <ul className="list-none space-y-2 text-sm text-zinc-400">
+                    <li className="flex gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                      {deployment?.errorMessage?.toLowerCase().includes('memory') || deployment?.errorMessage?.toLowerCase().includes('heap') ? (
+                         <span><b>Memory Limit Exceeded:</b> The build ran out of memory. Ensure you are not running heavy processes like <code>tsc</code> (TypeScript checking) in your build script.</span>
+                      ) : deployment?.errorMessage?.toLowerCase().includes('timeout') ? (
+                         <span><b>Build Timed Out:</b> The build took too long. Check if your build command gets stuck waiting for user input or enters an infinite loop.</span>
+                      ) : deployment?.errorMessage?.toLowerCase().includes('package.json') ? (
+                         <span><b>Missing package.json:</b> Ensure your repository has a valid <code>package.json</code> file at the root, or update the Root Directory setting.</span>
+                      ) : deployment?.errorMessage?.toLowerCase().includes('git') || deployment?.errorMessage?.toLowerCase().includes('clone') ? (
+                         <span><b>Repository Access:</b> Check if your GitHub repository is public or correctly linked. The platform could not clone it.</span>
+                      ) : (
+                         <span>Scroll down to the <b>System Pipeline Logs</b> terminal below to see the exact error output and stack trace.</span>
+                      )}
+                    </li>
+                    <li className="flex gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                      <span>Ensure your <code>buildCommand</code> (currently: <code>{deployment?.project?.buildCommand || 'npm run build'}</code>) runs successfully on your local machine.</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="mt-6 flex items-center gap-4">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const data = await apiFetch('/api/deployments', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            repoUrl: deployment.project.repoUrl,
+                            branch: deployment.branch || 'main',
+                            buildCommand: deployment.project.buildCommand,
+                            rootDirectory: deployment.project.rootDirectory
+                          })
+                        });
+
+                        if (data.success) {
+                          window.location.href = `/dashboard/deployments/${data.data.id}`;
+                        } else {
+                          alert('Redeploy failed: ' + (data.message || 'Check logs'));
+                        }
+                      } catch (e) {
+                        alert('Failed to trigger redeploy.');
+                      }
+                    }}
+                    className="flex items-center gap-3 bg-red-500/10 text-red-400 border border-red-500/20 px-8 py-3 rounded-xl font-bold text-sm hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-95"
+                  >
+                    <Zap className="w-4 h-4" /> Try Again
+                  </button>
+                  <Link 
+                    href={`/dashboard/projects/${deployment?.projectId}/settings`}
+                    className="flex items-center gap-2 text-zinc-400 hover:text-white px-4 py-2 text-sm transition-colors"
+                  >
+                    <Settings className="w-4 h-4" /> Check Project Settings
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Visual Progress Bar */}
             {(status === 'BUILDING' || status === 'QUEUED') && (
