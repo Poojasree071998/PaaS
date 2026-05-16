@@ -500,15 +500,26 @@ export class BuildService {
       }
       
       const isAlive = BuildService.isProcessRunning(deploymentId);
-      const isStatic = ['REACT', 'STATIC', 'ASTRO', 'VUE', 'SVELTE', 'ANGULAR', 'NEXTJS'].includes(deployment.project.framework) || !!foundFolder;
+      const staticFrameworks = ['REACT', 'STATIC', 'ASTRO', 'VUE', 'SVELTE', 'ANGULAR', 'NEXTJS'];
+      const isFrameworkStatic = staticFrameworks.includes(deployment.project.framework);
       
-      if (!foundFolder && !isAlive && !isStatic) {
+      // A deployment is only successful if it either:
+      // 1. Started a backend process successfully
+      // 2. Produced a static output folder (for static/frontend frameworks)
+      if (!isAlive && (!foundFolder || !isFrameworkStatic)) {
         // Log directory structure to help debug
         try {
           const files = fs.readdirSync(workingDir);
           await this.log(deploymentId, `❌ Health Check Failed. Contents of ${workingDir}: ${files.join(', ')}`, LogLevel.ERROR);
         } catch (e) {}
-        throw new Error(`Deployment Health Check Failed: No output assets found in (${assetFolders.join(', ')}) and no backend process is running.`);
+        
+        const reason = !isAlive && !foundFolder 
+          ? "No backend process started and no static assets found." 
+          : !isAlive && isFrameworkStatic && !foundFolder 
+          ? `Static build failed to produce assets in (${assetFolders.join(', ')})`
+          : "Deployment failed to initialize correctly.";
+          
+        throw new Error(`Deployment Health Check Failed: ${reason}`);
       }
 
       if (foundFolder) {
