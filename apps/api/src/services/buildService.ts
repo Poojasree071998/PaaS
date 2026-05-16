@@ -218,85 +218,65 @@ export class BuildService {
 
     const cacheDir = path.join(baseTempDir, `${deployment.projectId}-cache`);
 
-    // ENSURE CLEAN START: Real platforms always start from a clean state
-    await this.cleanupStaleProcesses(deployment.projectId);
+    // --- INTELLIGENT CACHE RECOVERY ---
+    // Instead of nuking everything, we salvage node_modules to speed up builds
     if (fs.existsSync(buildDir)) {
       try {
-        if (!fs.existsSync(cacheDir)) {
-          await fsPromises.mkdir(cacheDir, { recursive: true });
-        }
-        
-        // Salvage root node_modules
-        const rootNodeModules = path.join(buildDir, 'node_modules');
-        if (fs.existsSync(rootNodeModules)) {
-          await fsPromises.rename(rootNodeModules, path.join(cacheDir, 'node_modules'));
-        }
-        
-        // Salvage subfolder node_modules
-        const cacheSubfolders = ['backend', 'frontend', 'api', 'web', 'client', 'server'];
-        for (const folder of cacheSubfolders) {
-          const subNodeModules = path.join(buildDir, folder, 'node_modules');
-          if (fs.existsSync(subNodeModules)) {
-            if (!fs.existsSync(path.join(cacheDir, folder))) {
-               await fsPromises.mkdir(path.join(cacheDir, folder), { recursive: true });
-            }
-            await fsPromises.rename(subNodeModules, path.join(cacheDir, folder, 'node_modules'));
+        const salvagePaths = ['.', 'backend', 'frontend', 'api', 'web', 'client', 'server'];
+        for (const folder of salvagePaths) {
+          const target = path.join(buildDir, folder, 'node_modules');
+          const cache = path.join(cacheDir, folder, 'node_modules');
+          if (fs.existsSync(target)) {
+            if (!fs.existsSync(path.dirname(cache))) await fsPromises.mkdir(path.dirname(cache), { recursive: true });
+            await fsPromises.rename(target, cache);
           }
         }
       } catch (e) {
-        logger.warn(`Failed to salvage node_modules cache for ${deployment.projectId}:`, e);
+        logger.warn(`Cache salvage failed: ${e.message}`);
       }
-
-      try {
-        await fsPromises.rm(buildDir, { recursive: true, force: true });
-        await this.log(deploymentId, `🧹 Cleaned up previous build artifacts.`, LogLevel.INFO);
-      } catch (e) {}
+      
+      // Now safe to clean up the rest
+      await fsPromises.rm(buildDir, { recursive: true, force: true }).catch(() => {});
     }
 
     if (buildingDeployments.has(deployment.projectId)) {
-      await this.log(deploymentId, `⏳ A build is already active for this project. This usually happens during auto-recovery. We will wait for it to finish...`, LogLevel.WARN);
+      await this.log(deploymentId, `⏳ Waiting for active build lock...`, LogLevel.WARN);
       let waitTime = 0;
-      while (buildingDeployments.has(deployment.projectId) && waitTime < 120) {
+      while (buildingDeployments.has(deployment.projectId) && waitTime < 60) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         waitTime += 2;
-        const latest = await prisma.deployment.findFirst({
-          where: { projectId: deployment.projectId, status: DeploymentStatus.READY },
-          orderBy: { createdAt: 'desc' }
-        });
-        if (latest && latest.createdAt > deployment.createdAt) {
-          await this.log(deploymentId, `✅ Another build finished successfully while waiting. Skipping redundant build.`, LogLevel.INFO);
-          await prisma.deployment.update({ where: { id: deploymentId }, data: { status: DeploymentStatus.READY, url: latest.url } });
-          return;
-        }
       }
-      if (buildingDeployments.has(deployment.projectId)) {
-        await this.log(deploymentId, `⚠️ Previous build is taking too long. Forcing lock release...`, LogLevel.WARN);
-        buildingDeployments.delete(deployment.projectId);
-      }
+      buildingDeployments.delete(deployment.projectId);
     }
     
     buildingDeployments.add(deployment.projectId);
     
     try {
-      await this.log(deploymentId, `🔍 System Check: Platform=${process.platform}, CWD=${process.cwd()}, User=${process.env.USER || 'unknown'}`, LogLevel.INFO);
-      
-      if (process.platform === 'win32') await new Promise(resolve => setTimeout(resolve, 2000));
-
       await prisma.deployment.update({ where: { id: deploymentId }, data: { status: DeploymentStatus.BUILDING } });
-      await this.log(deploymentId, `[1/4] 📥 Fetching updates...`, LogLevel.INFO);
-      
+      await fsPromises.mkdir(buildDir, { recursive: true });
+
+      await this.log(deploymentId, `[1/4] 📥 Fetching source from Git...`, LogLevel.INFO);
+      const git = simpleGit(buildDir);
+      await git.clone(deployment.project.repoUrl, '.').catch(async (e) => {
+        // Fallback for shallow clone
+        await this.executeLiveCommand(deploymentId, `git clone --depth 1 --branch ${deployment.branch} ${deployment.project.repoUrl} .`, [], buildDir, env, 120000);
+      });
+
+      // --- CACHE RESTORATION ---
       try {
-        if (!fs.existsSync(rootBuildDir)) {
-          await fsPromises.mkdir(rootBuildDir, { recursive: true });
+        const restorePaths = ['.', 'backend', 'frontend', 'api', 'web', 'client', 'server'];
+        for (const folder of restorePaths) {
+          const cache = path.join(cacheDir, folder, 'node_modules');
+          const target = path.join(buildDir, folder, 'node_modules');
+          if (fs.existsSync(cache)) {
+            if (!fs.existsSync(path.dirname(target))) await fsPromises.mkdir(path.dirname(target), { recursive: true });
+            await fsPromises.rename(cache, target);
+            await this.log(deploymentId, `📦 Reused node_modules cache for /${folder}`, LogLevel.INFO);
+          }
         }
-        await fsPromises.mkdir(buildDir, { recursive: true });
-      } catch (e: any) {
-        throw new Error(`Failed to create build workspace: ${e.message}`);
+      } catch (e) {
+        logger.warn(`Cache restoration failed: ${e.message}`);
       }
-
-      if (!deployment.project.repoUrl) throw new Error('No GitHub repository URL provided.');
-
-      const git = simpleGit();
       
       // Verify environment
       try {
