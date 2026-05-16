@@ -171,27 +171,24 @@ export class ProxyService {
       }
 
       // 3. Define Search Folders (Expanded for deep assets)
+      // 3. Define Search Folders (Expanded for deep assets and monorepo root)
       const searchFolders = [
         path.join(projectPath, 'dist'),
         path.join(projectPath, 'build'),
         path.join(projectPath, 'public'),
         path.join(projectPath, 'out'),
         path.join(projectPath, '.next', 'static'),
-        path.join(projectPath, 'build', 'static'),
         path.join(projectPath, 'client', 'dist'),
-        path.join(projectPath, 'client', 'build'),
         path.join(projectPath, 'frontend', 'dist'),
-        path.join(projectPath, 'frontend', 'build'),
-        path.join(projectPath, 'apps', 'web', 'dist'),
-        path.join(projectPath, 'apps', 'web', 'build'),
-        path.join(projectPath, 'web', 'dist'),
-        path.join(projectPath, 'web', 'build'),
-        // Sub-assets folders
-        path.join(projectPath, 'dist', 'assets'),
-        path.join(projectPath, 'build', 'assets'),
-        path.join(projectPath, 'frontend', 'dist', 'assets'),
-        path.join(projectPath, 'frontend', 'build', 'assets'),
+        // Fallback to repository root search if rootDirectory is set
+        path.join(buildRoot, 'dist'),
+        path.join(buildRoot, 'build'),
+        path.join(buildRoot, 'public'),
+        path.join(buildRoot, 'frontend', 'dist'),
+        path.join(buildRoot, 'frontend', 'build'),
+        path.join(buildRoot, 'backend', 'public'),
         projectPath,
+        buildRoot,
       ];
 
       const isApiRequest = cleanPath.startsWith('api/') || cleanPath.startsWith('v1/') || cleanPath.includes('graphql');
