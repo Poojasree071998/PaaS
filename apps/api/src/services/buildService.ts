@@ -55,6 +55,27 @@ export class BuildService {
       }
     });
 
+    // --- AUTO-PROVISIONING FOR LOCALHOST ---
+    // If on localhost and MONGO_URI is missing, check if the project needs it
+    const isLocal = process.env.RENDER !== 'true' && (process.env.NODE_ENV !== 'production' || process.platform === 'win32');
+    if (isLocal && !env.MONGODB_URI && !env.MONGO_URI) {
+       // Check for mongodb/mongoose in package.json
+       const pkgPath = path.join(process.cwd(), 'temp-builds', 'deployflow-work', deployment.projectId, 'package.json');
+       let needsMongo = false;
+       if (fs.existsSync(pkgPath)) {
+         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+         const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+         if (deps.mongodb || deps.mongoose || deps['@prisma/client']) needsMongo = true;
+       }
+       
+       if (needsMongo) {
+         logger.info(`Auto-provisioning local MongoDB for project ${deployment.projectId}`);
+         const localUri = `mongodb://admin:password@127.0.0.1:27017/deployflow?authSource=admin`;
+         env.MONGODB_URI = localUri;
+         env.MONGO_URI = localUri;
+       }
+    }
+
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
     const baseUrl = process.env.API_URL || (isProduction ? 'https://paas-k7nx.onrender.com' : 'http://localhost:4000');
     const publicUrl = `${baseUrl}/live/${deployment.id}`;
