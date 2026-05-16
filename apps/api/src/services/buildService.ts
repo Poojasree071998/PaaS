@@ -99,6 +99,9 @@ export class BuildService {
       env.NEXT_PUBLIC_API_URL = publicUrl;
       env.VITE_API_BASE = publicUrl;
       env.VITE_API_URL = publicUrl;
+      env.VITE_SKIP_SOURCEMAP = 'true';
+      env.GENERATE_SOURCEMAP = 'false';
+      env.CI = 'false';
     }
 
     return env;
@@ -488,7 +491,8 @@ export class BuildService {
 
             await this.log(deploymentId, `🔨 Building detected sub-project: '${folder}'...`, LogLevel.INFO);
             try {
-              await this.executeLiveCommand(deploymentId, 'npm run build', [], folderPath, env, 600000);
+              // Increase timeout to 20 minutes for sub-projects too
+              await this.executeLiveCommand(deploymentId, 'npm run build', [], folderPath, env, 1200000);
             } catch (e) {
               await this.log(deploymentId, `⚠️ Build failed for '${folder}', skipping...`, LogLevel.WARN);
             }
