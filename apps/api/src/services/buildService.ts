@@ -221,36 +221,22 @@ export class BuildService {
 
     const cacheDir = path.join(baseTempDir, `${deployment.projectId}-cache`);
 
-    // --- INTELLIGENT CACHE RECOVERY ---
-    // Ensure all processes for this project are stopped before we touch files
+    // --- STABILITY FIRST: CLEAN START ---
+    // Ensure all stale processes are stopped to unlock the directory
     await this.cleanupStaleProcesses(deployment.projectId);
 
-    // Instead of nuking everything, we salvage node_modules to speed up builds
+    // Clean build directory
     if (fs.existsSync(buildDir)) {
-      try {
-        const salvagePaths = ['.', 'backend', 'frontend', 'api', 'web', 'client', 'server'];
-        for (const folder of salvagePaths) {
-          const target = path.join(buildDir, folder, 'node_modules');
-          const cache = path.join(cacheDir, folder, 'node_modules');
-          if (fs.existsSync(target)) {
-            if (!fs.existsSync(path.dirname(cache))) await fsPromises.mkdir(path.dirname(cache), { recursive: true });
-            await fsPromises.rename(target, cache);
-          }
-        }
-      } catch (e: any) {
-        logger.warn(`Cache salvage failed: ${e.message}`);
-      }
-      
-      // Now safe to clean up the rest
       await fsPromises.rm(buildDir, { recursive: true, force: true }).catch(() => {});
     }
+    await fsPromises.mkdir(buildDir, { recursive: true });
 
     if (buildingDeployments.has(deployment.projectId)) {
-      await this.log(deploymentId, `⏳ Waiting for active build lock...`, LogLevel.WARN);
+      await this.log(deploymentId, `⏳ Waiting for previous build lock to clear...`, LogLevel.WARN);
       let waitTime = 0;
-      while (buildingDeployments.has(deployment.projectId) && waitTime < 60) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        waitTime += 2;
+      while (buildingDeployments.has(deployment.projectId) && waitTime < 30) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        waitTime++;
       }
       buildingDeployments.delete(deployment.projectId);
     }
@@ -259,73 +245,30 @@ export class BuildService {
     
     try {
       await prisma.deployment.update({ where: { id: deploymentId }, data: { status: DeploymentStatus.BUILDING } });
-      await fsPromises.mkdir(buildDir, { recursive: true });
-
-      await this.log(deploymentId, `[1/4] 📥 Fetching source from Git...`, LogLevel.INFO);
+      
+      await this.log(deploymentId, `[1/4] 🚀 Fetching latest source...`, LogLevel.INFO);
       const git = simpleGit(buildDir);
-      await git.clone(deployment.project.repoUrl, '.').catch(async (e) => {
-        // Fallback for shallow clone
-        await this.executeLiveCommand(deploymentId, `git clone --depth 1 --branch ${deployment.branch} ${deployment.project.repoUrl} .`, [], buildDir, env, 120000);
-      });
-
-      // --- CACHE RESTORATION ---
+      
       try {
-        const restorePaths = ['.', 'backend', 'frontend', 'api', 'web', 'client', 'server'];
-        for (const folder of restorePaths) {
-          const cache = path.join(cacheDir, folder, 'node_modules');
-          const target = path.join(buildDir, folder, 'node_modules');
-          if (fs.existsSync(cache)) {
-            if (!fs.existsSync(path.dirname(target))) await fsPromises.mkdir(path.dirname(target), { recursive: true });
-            await fsPromises.rename(cache, target);
-            await this.log(deploymentId, `📦 Reused node_modules cache for /${folder}`, LogLevel.INFO);
-          }
-        }
+        await git.clone(deployment.project.repoUrl, '.', ['--depth', '1']);
+        await this.log(deploymentId, `✅ Successfully cloned repository.`, LogLevel.INFO);
       } catch (e: any) {
-        logger.warn(`Cache restoration failed: ${e.message}`);
+        await this.log(deploymentId, `⚠️ Git clone failed, attempting fallback download...`, LogLevel.WARN);
+        await BuildService.downloadGithubRepo(deployment.project.repoUrl, buildDir, deploymentId);
       }
       
-      // Verify environment
-      try {
-        await git.version();
-      } catch (e) {
-        throw new Error('System environment error: Git not found. Please contact support.');
-      }
-
-      await this.log(deploymentId, `  ↳ Cloning repository from GitHub...`, LogLevel.INFO);
-      try {
-        await git.clone(deployment.project.repoUrl, buildDir, ['--depth', '1']);
-        await this.log(deploymentId, `  ↳ Clone complete.`, LogLevel.INFO);
-      } catch (e: any) {
-        if (e.message.includes('ENOENT') || e.message.includes('git not found')) {
-          await BuildService.log(deploymentId, `⚠️ System 'git' not found. Falling back to High-Speed API Download...`, LogLevel.WARN);
-          await BuildService.downloadGithubRepo(deployment.project.repoUrl, buildDir, deploymentId);
-        } else {
-          throw new Error(`Failed to clone repository: ${e.message}`);
-        }
-      }
-
-      // Restore cache
-      if (fs.existsSync(cacheDir)) {
-        try {
-          await this.log(deploymentId, `⚡ Restoring node_modules cache to speed up build...`, LogLevel.INFO);
-          const cachedRootModules = path.join(cacheDir, 'node_modules');
-          if (fs.existsSync(cachedRootModules)) {
-            await fsPromises.rename(cachedRootModules, path.join(buildDir, 'node_modules'));
-          }
-          const cacheSubfolders = ['backend', 'frontend', 'api', 'web', 'client', 'server'];
-          for (const folder of cacheSubfolders) {
-            const cachedSubModules = path.join(cacheDir, folder, 'node_modules');
-            if (fs.existsSync(cachedSubModules)) {
-               if (!fs.existsSync(path.join(buildDir, folder))) {
-                 await fsPromises.mkdir(path.join(buildDir, folder), { recursive: true });
-               }
-               await fsPromises.rename(cachedSubModules, path.join(buildDir, folder, 'node_modules'));
-            }
-          }
-          await fsPromises.rm(cacheDir, { recursive: true, force: true }); // cleanup cache dir after restore
-        } catch (e) {
-          logger.warn(`Failed to restore node_modules cache for ${deployment.projectId}:`, e);
-        }
+      // Verify workspace
+      if (!fs.existsSync(path.join(buildDir, 'package.json')) && !fs.existsSync(path.join(buildDir, 'frontend'))) {
+         // Check if it's in a subfolder (common in monorepos or zip downloads)
+         const entries = fs.readdirSync(buildDir).filter(f => !f.startsWith('.'));
+         if (entries.length === 1 && fs.lstatSync(path.join(buildDir, entries[0])).isDirectory()) {
+           const subDir = path.join(buildDir, entries[0]);
+           await this.log(deploymentId, `📂 Normalizing project structure...`, LogLevel.INFO);
+           const subEntries = fs.readdirSync(subDir);
+           for (const ent of subEntries) {
+             await fsPromises.rename(path.join(subDir, ent), path.join(buildDir, ent));
+           }
+         }
       }
 
       const port = await this.findAvailablePort();
