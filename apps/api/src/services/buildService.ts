@@ -419,13 +419,8 @@ export class BuildService {
         env.PUBLIC_URL = basePath;
         env.VITE_BASE_PATH = basePath;
 
-        try {
-          await this.executeLiveCommand(deploymentId, bCmd, [], workingDir, env, 1200000);
-        } catch (err) {
-          await this.log(deploymentId, `⚠️ Root build failed. Continuing to subfolders...`, LogLevel.WARN);
-        }
-
-        // --- RECURSIVE MONOREPO BUILD: Always build subfolders if they exist ---
+        // --- LOW MEMORY OPTIMIZATION FOR SUBFOLDERS ---
+        // Strip 'tsc' from subfolders BEFORE running the root build, in case the root build delegates to subfolders
         const subfolders = fs.readdirSync(workingDir).filter(f => 
           fs.lstatSync(path.join(workingDir, f)).isDirectory() && 
           fs.existsSync(path.join(workingDir, f, 'package.json')) &&
@@ -437,13 +432,26 @@ export class BuildService {
           const pkgPath = path.join(folderPath, 'package.json');
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
           
-          if (pkg.scripts?.build) {
-            // Strip 'tsc' for subfolders too
-            if (pkg.scripts.build.includes('tsc')) {
-              pkg.scripts.build = pkg.scripts.build.replace(/tsc\s*&&\s*/g, '').replace(/vue-tsc\s*&&\s*/g, '');
-              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-            }
+          if (pkg.scripts?.build && pkg.scripts.build.includes('tsc')) {
+            pkg.scripts.build = pkg.scripts.build.replace(/tsc\s*&&\s*/g, '').replace(/vue-tsc\s*&&\s*/g, '');
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+          }
+        }
 
+        try {
+          // Reduced timeout to 5 minutes to fail fast on free tiers instead of hanging
+          await this.executeLiveCommand(deploymentId, bCmd, [], workingDir, env, 300000);
+        } catch (err) {
+          await this.log(deploymentId, `⚠️ Root build failed. Continuing to subfolders...`, LogLevel.WARN);
+        }
+
+        // --- RECURSIVE MONOREPO BUILD: Always build subfolders if they exist ---
+        for (const folder of subfolders) {
+          const folderPath = path.join(workingDir, folder);
+          const pkgPath = path.join(folderPath, 'package.json');
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          
+          if (pkg.scripts?.build) {
             await this.log(deploymentId, `🔨 Building detected sub-project: '${folder}'...`, LogLevel.INFO);
             try {
               await this.executeLiveCommand(deploymentId, 'npm run build', [], folderPath, env, 600000);
